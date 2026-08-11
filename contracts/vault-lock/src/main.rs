@@ -6,18 +6,19 @@ extern crate alloc;
 
 #[cfg(not(any(feature = "library", test)))]
 ckb_std::entry!(program_entry);
+
 #[cfg(not(any(feature = "library", test)))]
-// By default, the following heap configuration is used:
-// * 16KB fixed heap
-// * 1.2MB(rounded up to be 16-byte aligned) dynamic heap
-// * Minimal memory block in dynamic heap is 64 bytes
-// For more details, please refer to ckb-std's default_alloc macro
-// and the buddy-alloc alloc implementation.
 ckb_std::default_alloc!(16384, 1258306, 64);
 
+use ckb_std::high_level::load_script;
+
 pub fn program_entry() -> i8 {
-    ckb_std::debug!("This is a sample contract!");
+    let script = load_script().expect("failed to load script");
+
+    let args = script.args().raw_data();
+
+    ckb_std::debug!("Vault lock args:");
+    ckb_std::debug!("{:?}", args);
 
     0
 }
-     
