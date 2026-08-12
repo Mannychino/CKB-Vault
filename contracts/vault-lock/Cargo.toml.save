@@ -12,4 +12,3 @@ ckb-testtool = "1.1.1"
 [features]
 library = []
 native-simulator = ["library", "ckb-std/native-simulator"]
-
