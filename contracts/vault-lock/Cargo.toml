@@ -13,3 +13,7 @@ ckb-testtool = "1.1.1"
 library = []
 native-simulator = ["library", "ckb-std/native-simulator"]
 
+[[bin]]
+name = "vault-lock"
+path = "src/contract.rs"
+test = false
