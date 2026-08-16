@@ -63,3 +63,4 @@ fn test_vault_lock() {
         .expect("transaction should pass");
 
     println!("✅ Vault lock test passed!");
+}

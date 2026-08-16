@@ -1862,6 +1862,7 @@ version = "0.1.0"
 dependencies = [
  "ckb-std",
  "ckb-testtool",
+ "ckb-types",
 ]
 
 [[package]]
