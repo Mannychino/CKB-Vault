@@ -30,18 +30,17 @@ fn test_vault_lock() {
         .expect("failed to build lock script");
 
     // Create input cell.
-    let input_out_point = context.create_cell(
-        CellOutput::new_builder()
-            .capacity(1000u64)
-            .lock(lock_script.clone())
-            .build(),
-        Bytes::new(),
-    );
-
-    let input = CellInput::new_builder()
-        .previous_output(input_out_point)
-        .build();
-
+   let input_out_point = context.create_cell(
+    CellOutput::new_builder()
+        .capacity(1000u64)
+        .lock(lock_script.clone())
+        .build(),
+    Bytes::from(100u64.to_le_bytes().to_vec()),
+);
+let input = CellInput::new_builder()
+    .previous_output(input_out_point)
+    .since(50u64)
+    .build();
     // Create output cell.
     let output = CellOutput::new_builder()
         .capacity(1000u64)
@@ -62,5 +61,6 @@ fn test_vault_lock() {
         .verify_tx(&tx, 10_000_000)
         .expect("transaction should pass");
 
-    println!("✅ Vault lock test passed!");
+    println!("Vault lock test passed!");
 }
+
