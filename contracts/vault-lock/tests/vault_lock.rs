@@ -37,10 +37,12 @@ fn test_vault_lock() {
         .build(),
     Bytes::from(100u64.to_le_bytes().to_vec()),
 );
+
 let input = CellInput::new_builder()
     .previous_output(input_out_point)
-    .since(50u64)
+    .since(100u64)
     .build();
+
     // Create output cell.
     let output = CellOutput::new_builder()
         .capacity(1000u64)
