@@ -1,0 +1,12 @@
+{
+  "cell_recipes": [
+    {
+      "name": "vault-lock",
+      "tx_hash": "0xb8aadf87a93f0f388f6dcfeaf7d425a2a55cbf15c565ccd83b85f4693f69bff7",
+      "index": 0,
+      "occupied_capacity": 9355200000000,
+      "data_hash": "0x6c4c1c2174b32852799498439844ff66100fba73d10b4b8941f800b14d50496b"
+    }
+  ],
+  "dep_group_recipes": []
+}
