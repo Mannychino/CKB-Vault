@@ -1,5 +1,9 @@
 {
 	"dependencies": {
-		"@ckb-ccc/core": "^1.19.1"
+		"@ckb-ccc/core": "^1.19.1",
+		"@ckb-ccc/shell": "^1.3.9"
+	},
+	"devDependencies": {
+		"@types/node": "^26.3.0"
 	}
 }
