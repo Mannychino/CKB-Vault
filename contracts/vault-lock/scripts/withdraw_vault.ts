@@ -296,7 +296,7 @@ async function main() {
 
   console.log("\n========================================");
   console.log("VAULT WITHDRAWN");
-  console.log("========================================");
+
 
   console.log(
     "Transaction hash:",
@@ -312,8 +312,6 @@ async function main() {
 main().catch((error) => {
   console.error("\n========================================");
   console.error("WITHDRAW FAILED");
-  console.error("========================================");
-
   console.error(error);
 
   process.exit(1);
