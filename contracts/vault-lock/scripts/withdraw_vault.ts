@@ -8,18 +8,19 @@ import {
 const RPC_URL = "http://127.0.0.1:28114";
 const RPC_FALLBACK = "http://127.0.0.1:8114";
 
-const VAULT_LOCK_CODE_HASH =
-  "0x6c4c1c2174b32852799498439844ff66100fba73d10b4b8941f800b14d50496b";
+const VAULT_TX_HASH =
+  "0x055f5863e0ce96c6b7c1f2d07d3845974bc6e6b12a58421e499834256045e091";
 
-const VAULT_LOCK_HASH_TYPE = "data2" as const;
+const VAULT_INDEX = 0n;
 
 const VAULT_LOCK_DEP_TX_HASH =
   "0xb596420ac646a86316d6133df789d3f8fe3495970265587f266f380492e59484";
 
 const VAULT_LOCK_DEP_INDEX = 0n;
 
-const VAULT_AMOUNT = "5000";
 const TIMELOCK = 100n;
+
+const TX_FEE = 100_000n;
 
 type KnownScriptType = Pick<Script, "codeHash" | "hashType"> & {
   cellDeps: CellDepInfoLike[];
@@ -164,78 +165,82 @@ async function main() {
     throw new Error("CKB_PRIVATE_KEY is not set");
   }
 
-  if (!/^0x[0-9a-fA-F]{64}$/.test(privateKey)) {
-    throw new Error("Invalid CKB_PRIVATE_KEY");
-  }
-
   const signer = new ccc.SignerCkbPrivateKey(
     client,
     privateKey,
   );
 
-  const senderAddress =
-    await signer.getRecommendedAddress();
+  const recipientAddress =
+    await signer.getRecommendedAddressObj();
 
-  console.log("Signer:", senderAddress);
+  const recipientLock = recipientAddress.script;
+
+  console.log(
+    "Withdraw destination:",
+    await signer.getRecommendedAddress(),
+  );
+
+  const vaultOutPoint = ccc.OutPoint.from({
+    txHash: VAULT_TX_HASH,
+    index: VAULT_INDEX,
+  });
+
+  console.log("\nChecking vault Cell...");
+
+  const vaultCell =
+    await client.getCell(vaultOutPoint);
+
+  if (!vaultCell) {
+    throw new Error(
+      `Vault Cell is not live: ${VAULT_TX_HASH}:${VAULT_INDEX}`,
+    );
+  }
+
+  console.log("Vault Cell is live.");
+  console.log(
+    "Vault capacity:",
+    vaultCell.cellOutput.capacity.toString(),
+    "Shannons",
+  );
+
+  console.log(
+    "Vault data:",
+    vaultCell.outputData,
+  );
+
+  const expectedData = "0x6400000000000000";
+
+  if (vaultCell.outputData !== expectedData) {
+    throw new Error(
+      `Unexpected vault data: ${vaultCell.outputData}`,
+    );
+  }
+
+  const withdrawCapacity =
+    vaultCell.cellOutput.capacity - TX_FEE;
 
   const vaultDepOutPoint = ccc.OutPoint.from({
     txHash: VAULT_LOCK_DEP_TX_HASH,
     index: VAULT_LOCK_DEP_INDEX,
   });
 
-  console.log("\nChecking vault contract Cell...");
-
-  const vaultContractCell =
-    await client.getCell(vaultDepOutPoint);
-
-  if (!vaultContractCell) {
-    throw new Error(
-      `Vault contract Cell not found: ${VAULT_LOCK_DEP_TX_HASH}:${VAULT_LOCK_DEP_INDEX}`,
-    );
-  }
-
-  console.log("Vault contract Cell found.");
-  console.log(
-    "Contract capacity:",
-    vaultContractCell.cellOutput.capacity.toString(),
-    "Shannons",
-  );
-
-  const vaultLock = ccc.Script.from({
-    codeHash: VAULT_LOCK_CODE_HASH,
-    hashType: VAULT_LOCK_HASH_TYPE,
-    args: "0x",
-  });
-
-  const timelockBytes = new Uint8Array(8);
-
-  new DataView(
-    timelockBytes.buffer,
-  ).setBigUint64(
-    0,
-    TIMELOCK,
-    true,
-  );
-
-  const timelockData =
-    ccc.hexFrom(timelockBytes);
-
-  console.log("\nVault lock script created.");
-  console.log("Timelock:", TIMELOCK.toString());
-  console.log("Timelock data:", timelockData);
-
-  const vaultCapacity =
-    ccc.fixedPointFrom(VAULT_AMOUNT);
-
   const tx = ccc.Transaction.from({
-    outputs: [
+    inputs: [
       {
-        capacity: vaultCapacity,
-        lock: vaultLock,
+        previousOutput: vaultOutPoint,
+        since: TIMELOCK,
       },
     ],
+
+    outputs: [
+      {
+        capacity: withdrawCapacity,
+        lock: recipientLock,
+      },
+    ],
+
     outputsData: [
-      timelockData,
+      "0x",
     ],
   });
 
@@ -246,71 +251,35 @@ async function main() {
     }),
   );
 
-  console.log("\nCreating transaction...");
-  console.log(
-    "Vault output capacity:",
-    vaultCapacity.toString(),
-    "Shannons",
-  );
-
-  console.log(
-    "Vault CellDep:",
-    `${VAULT_LOCK_DEP_TX_HASH}:${VAULT_LOCK_DEP_INDEX}`,
-  );
-
-  console.log("\nSelecting funding Cells...");
-
-  await tx.completeInputsByCapacity(signer);
-
-  console.log(
-    "Inputs selected:",
-    tx.inputs.length,
-  );
-
-  console.log("\nCalculating fee and change...");
-
-  const [
-    additionalInputs,
-    changeCreated,
-  ] = await tx.completeFeeBy(signer);
-
-  console.log(
-    "Additional inputs:",
-    additionalInputs,
-  );
-
-  console.log(
-    "Change created:",
-    changeCreated,
-  );
-
   console.log("\n========================================");
-  console.log("TRANSACTION");
+  console.log("WITHDRAW TRANSACTION");
   console.log("========================================");
 
-  console.log("\nInputs:");
+  console.log(
+    "Input:",
+    `${VAULT_TX_HASH}:${VAULT_INDEX}`,
+  );
 
-  tx.inputs.forEach((input, i) => {
-    console.log(
-      `Input ${i}: ${input.previousOutput.txHash}:${input.previousOutput.index}`,
-    );
-  });
+  console.log(
+    "Input since:",
+    tx.inputs[0].since.toString(),
+  );
 
-  console.log("\nOutputs:");
+  console.log(
+    "Input capacity:",
+    vaultCell.cellOutput.capacity.toString(),
+  );
 
-  tx.outputs.forEach((output, i) => {
-    console.log(
-      `Output ${i}: ${output.capacity.toString()} Shannons`,
-    );
-  });
+  console.log(
+    "Output capacity:",
+    withdrawCapacity.toString(),
+  );
 
-  console.log("\nOutputsData:");
-
-  tx.outputsData.forEach((data, i) => {
-    console.log(
-      `OutputData ${i}: ${data}`,
-    );
-  });
+  console.log(
+    "Fee:",
+    TX_FEE.toString(),
+    "Shannons",
+  );
 
   console.log("\nCellDeps:");
 
@@ -320,29 +289,32 @@ async function main() {
     );
   });
 
-  console.log("\nSending transaction...");
+  console.log("\nBroadcasting withdrawal...");
 
   const txHash =
-    await signer.sendTransaction(tx);
+    await client.sendTransaction(tx);
 
   console.log("\n========================================");
-  console.log("VAULT CREATED");
+  console.log("VAULT WITHDRAWN");
   console.log("========================================");
 
-  console.log("Transaction hash:", txHash);
-  console.log("Vault Cell:", `${txHash}:0`);
-  console.log("Vault amount:", VAULT_AMOUNT, "CKB");
-  console.log("Timelock:", TIMELOCK.toString());
-  console.log("Vault data:", timelockData);
+  console.log(
+    "Transaction hash:",
+    txHash,
+  );
+
+  console.log(
+    "New output Cell:",
+    `${txHash}:0`,
+  );
 }
 
 main().catch((error) => {
   console.error("\n========================================");
-  console.error("FAILED TO CREATE VAULT");
+  console.error("WITHDRAW FAILED");
   console.error("========================================");
 
   console.error(error);
 
   process.exit(1);
 });
-
