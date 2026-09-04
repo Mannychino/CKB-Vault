@@ -1,0 +1,12 @@
+{
+  "cell_recipes": [
+    {
+      "name": "README.md",
+      "tx_hash": "0x2c9760c8c2a8cc596f1655e76814c88362b2358fa9fe69e8b8d2841a6fee338b",
+      "index": 0,
+      "occupied_capacity": 1002600000000,
+      "data_hash": "0xaf54cce2729447798f0cb8de2d74bfc7fc56d69d36f76b47c03335cb1b338648"
+    }
+  ],
+  "dep_group_recipes": []
+}
