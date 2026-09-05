@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import {
   ccc,
   CellDepInfoLike,
@@ -5,190 +8,419 @@ import {
   Script,
 } from "@ckb-ccc/core";
 
-const RPC_URL = "http://127.0.0.1:28114";
-const RPC_FALLBACK = "http://127.0.0.1:8114";
+type Hex = `0x${string}`;
+
+type HashType =
+  | "data"
+  | "type"
+  | "data1"
+  | "data2";
+
+type DepType =
+  | "code"
+  | "depGroup";
+
+type JsonCellDep = {
+  cellDep: {
+    outPoint: {
+      txHash: Hex;
+      index: number;
+    };
+    depType: DepType;
+  };
+};
+
+type JsonScript = {
+  codeHash: Hex;
+  hashType: HashType;
+  cellDeps: JsonCellDep[];
+};
+
+type DeploymentScript = {
+  codeHash: Hex;
+  hashType: HashType;
+  cellDeps: JsonCellDep[];
+};
+
+type DeploymentFile = Record<
+  string,
+  Record<string, DeploymentScript>
+>;
+
+type SystemScriptEntry = {
+  script: JsonScript;
+};
+
+type SystemScriptsFile = Record<
+  string,
+  Record<string, SystemScriptEntry>
+>;
+
+type KnownScriptType =
+  Pick<Script, "codeHash" | "hashType"> & {
+    cellDeps: CellDepInfoLike[];
+  };
+
+const NETWORK =
+  process.env.CKB_NETWORK ?? "devnet";
+
+const RPC_URL =
+  process.env.CKB_RPC_URL ??
+  "http://127.0.0.1:28114";
+
+const RPC_FALLBACK =
+  process.env.CKB_RPC_FALLBACK ??
+  "http://127.0.0.1:8114";
 
 const VAULT_TX_HASH =
-  "0x055f5863e0ce96c6b7c1f2d07d3845974bc6e6b12a58421e499834256045e091";
+  process.env.VAULT_TX_HASH as Hex | undefined;
 
-const VAULT_INDEX = 0n;
+const VAULT_INDEX =
+  BigInt(
+    process.env.VAULT_INDEX ??
+      "0",
+  );
 
-const VAULT_LOCK_DEP_TX_HASH =
-  "0xb596420ac646a86316d6133df789d3f8fe3495970265587f266f380492e59484";
+const TX_FEE =
+  BigInt(
+    process.env.VAULT_WITHDRAW_FEE ??
+      "100000",
+  );
 
-const VAULT_LOCK_DEP_INDEX = 0n;
+const DEPLOYMENT_DIR =
+  process.env.CKB_DEPLOYMENT_DIR ??
+  path.resolve(
+    process.cwd(),
+    "contracts/vault-lock/deployment",
+  );
 
-const TIMELOCK = 100n;
+const SCRIPTS_PATH =
+  process.env.CKB_VAULT_SCRIPTS_PATH ??
+  path.join(
+    DEPLOYMENT_DIR,
+    "scripts.json",
+  );
 
-const TX_FEE = 100_000n;
+const SYSTEM_SCRIPTS_PATH =
+  process.env.CKB_SYSTEM_SCRIPTS_PATH ??
+  path.join(
+    DEPLOYMENT_DIR,
+    "system-scripts.json",
+  );
 
-type KnownScriptType = Pick<Script, "codeHash" | "hashType"> & {
-  cellDeps: CellDepInfoLike[];
-};
+function readJsonFile<T>(
+  filePath: string,
+): T {
+  try {
+    return JSON.parse(
+      readFileSync(
+        filePath,
+        "utf8",
+      ),
+    ) as T;
+  } catch (error) {
+    throw new Error(
+      `Failed to read ${filePath}: ${String(
+        error,
+      )}`,
+    );
+  }
+}
 
-const DEVNET_SCRIPTS: Record<string, KnownScriptType> = {
-  [KnownScript.Secp256k1Blake160]: {
+function loadVaultDeployment():
+  DeploymentScript {
+  const deployments =
+    readJsonFile<DeploymentFile>(
+      SCRIPTS_PATH,
+    );
+
+  const network =
+    deployments[NETWORK];
+
+  if (!network) {
+    throw new Error(
+      `Network "${NETWORK}" not found in ${SCRIPTS_PATH}`,
+    );
+  }
+
+  const vault =
+    network["vault-lock"];
+
+  if (!vault) {
+    throw new Error(
+      `vault-lock deployment not found for "${NETWORK}"`,
+    );
+  }
+
+  if (
+    !vault.cellDeps ||
+    vault.cellDeps.length === 0
+  ) {
+    throw new Error(
+      "vault-lock deployment has no CellDep",
+    );
+  }
+
+  return vault;
+}
+
+function toKnownScript(
+  script: JsonScript,
+): KnownScriptType {
+  return {
     codeHash:
-      "0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8",
-    hashType: "type",
-    cellDeps: [
-      {
-        cellDep: {
-          outPoint: {
-            txHash:
-              "0x4d804f1495612631da202fe9902fa9899118554b08138cfe5dfb50e1ede76293",
-            index: 0,
-          },
-          depType: "depGroup",
-        },
-      },
-    ],
-  },
+      script.codeHash,
 
-  [KnownScript.Secp256k1Multisig]: {
-    codeHash:
-      "0x5c5069eb0857efc65e1bca0c07df34c31663b3622fd3876c876320fc9634e2a8",
-    hashType: "type",
-    cellDeps: [
-      {
-        cellDep: {
-          outPoint: {
-            txHash:
-              "0x4d804f1495612631da202fe9902fa9899118554b08138cfe5dfb50e1ede76293",
-            index: 1,
-          },
-          depType: "depGroup",
-        },
-      },
-    ],
-  },
+    hashType:
+      script.hashType,
 
-  [KnownScript.NervosDao]: {
-    codeHash:
-      "0x82d76d1b75fe2fd9a27dfbaa65a039221a380d76c926f378d3f81cf3e7e13f2e",
-    hashType: "type",
-    cellDeps: [
-      {
-        cellDep: {
-          outPoint: {
-            txHash:
-              "0x1bb87da347a776a927ab6593e1e10304ca195f8e24279f039008d5e3115b1bf7",
-            index: 2,
-          },
-          depType: "code",
-        },
-      },
-    ],
-  },
+    cellDeps:
+      script.cellDeps as CellDepInfoLike[],
+  };
+}
 
-  [KnownScript.AnyoneCanPay]: {
-    codeHash:
-      "0xe09352af0066f3162287763ce4ddba9af6bfaeab198dc7ab37f8c71c9e68bb5b",
-    hashType: "type",
-    cellDeps: [
-      {
-        cellDep: {
-          outPoint: {
-            txHash:
-              "0x1bb87da347a776a927ab6593e1e10304ca195f8e24279f039008d5e3115b1bf7",
-            index: 8,
-          },
-          depType: "code",
-        },
-      },
-    ],
-  },
+function loadSystemScripts():
+  Record<string, KnownScriptType> {
+  const file =
+    readJsonFile<SystemScriptsFile>(
+      SYSTEM_SCRIPTS_PATH,
+    );
 
-  [KnownScript.OmniLock]: {
-    codeHash:
-      "0x9c6933d977360f115a3e9cd5a2e0e475853681b80d775d93ad0f8969da343e56",
-    hashType: "type",
-    cellDeps: [
-      {
-        cellDep: {
-          outPoint: {
-            txHash:
-              "0x1bb87da347a776a927ab6593e1e10304ca195f8e24279f039008d5e3115b1bf7",
-            index: 7,
-          },
-          depType: "code",
-        },
-      },
-      {
-        cellDep: {
-          outPoint: {
-            txHash:
-              "0x4d804f1495612631da202fe9902fa9899118554b08138cfe5dfb50e1ede76293",
-            index: 0,
-          },
-          depType: "depGroup",
-        },
-      },
-    ],
-  },
+  const scripts =
+    file[NETWORK];
 
-  [KnownScript.XUdt]: {
-    codeHash:
-      "0x1a1e4fef34f5982906f745b048fe7b1089647e82346074e0f32c2ece26cf6b1e",
-    hashType: "type",
-    cellDeps: [
-      {
-        cellDep: {
-          outPoint: {
-            txHash:
-              "0x1bb87da347a776a927ab6593e1e10304ca195f8e24279f039008d5e3115b1bf7",
-            index: 6,
-          },
-          depType: "code",
-        },
-      },
-    ],
-  },
-};
+  if (!scripts) {
+    throw new Error(
+      `Network "${NETWORK}" not found in ${SYSTEM_SCRIPTS_PATH}`,
+    );
+  }
 
-function createDevnetClient() {
+  const getScript = (
+    name: string,
+  ) => {
+    const entry =
+      scripts[name];
+
+    if (!entry) {
+      throw new Error(
+        `System script "${name}" not found`,
+      );
+    }
+
+    return entry.script;
+  };
+
+  return {
+    [KnownScript.Secp256k1Blake160]:
+      toKnownScript(
+        getScript(
+          "secp256k1_blake160_sighash_all",
+        ),
+      ),
+
+    [KnownScript.Secp256k1Multisig]:
+      toKnownScript(
+        getScript(
+          "secp256k1_blake160_multisig_all",
+        ),
+      ),
+
+    [KnownScript.NervosDao]:
+      toKnownScript(
+        getScript("dao"),
+      ),
+
+    [KnownScript.AnyoneCanPay]:
+      toKnownScript(
+        getScript(
+          "anyone_can_pay",
+        ),
+      ),
+
+    [KnownScript.OmniLock]:
+      toKnownScript(
+        getScript("omnilock"),
+      ),
+
+    [KnownScript.XUdt]:
+      toKnownScript(
+        getScript("xudt"),
+      ),
+  };
+}
+
+function createClient() {
+  if (NETWORK !== "devnet") {
+    throw new Error(
+      `Only devnet is currently supported. Received: ${NETWORK}`,
+    );
+  }
+
   return new ccc.ClientPublicTestnet({
-    url: RPC_URL,
-    scripts: DEVNET_SCRIPTS,
-    fallbacks: [RPC_FALLBACK],
+    url:
+      RPC_URL,
+
+    scripts:
+      loadSystemScripts(),
+
+    fallbacks:
+      RPC_FALLBACK
+        ? [RPC_FALLBACK]
+        : [],
   });
 }
 
-async function main() {
-  console.log("Connecting to CKB devnet...");
+function decodeTimelock(
+  data: Hex,
+): bigint {
+  const hex =
+    data.slice(2);
 
-  const client = createDevnetClient();
-
-  const privateKey = process.env.CKB_PRIVATE_KEY;
-
-  if (!privateKey) {
-    throw new Error("CKB_PRIVATE_KEY is not set");
+  if (hex.length < 16) {
+    throw new Error(
+      `Vault data must contain at least 8 bytes. Received: ${data}`,
+    );
   }
 
-  const signer = new ccc.SignerCkbPrivateKey(
-    client,
-    privateKey,
+  const firstEightBytes =
+    hex.slice(0, 16);
+
+  const bytes =
+    firstEightBytes.match(/.{2}/g);
+
+  if (!bytes) {
+    throw new Error(
+      `Unable to decode vault timelock: ${data}`,
+    );
+  }
+
+  const bigEndian =
+    bytes
+      .reverse()
+      .join("");
+
+  return BigInt(
+    `0x${bigEndian}`,
+  );
+}
+
+async function main() {
+  console.log(
+    "Connecting to CKB devnet...",
   );
 
-  const recipientAddress =
-    await signer.getRecommendedAddressObj();
+  console.log(
+    "RPC:",
+    RPC_URL,
+  );
 
-  const recipientLock = recipientAddress.script;
+  console.log(
+    "Deployment config:",
+    SCRIPTS_PATH,
+  );
+
+  console.log(
+    "System scripts:",
+    SYSTEM_SCRIPTS_PATH,
+  );
+
+  if (!VAULT_TX_HASH) {
+    throw new Error(
+      "VAULT_TX_HASH is not set",
+    );
+  }
+
+  if (
+    !/^0x[0-9a-fA-F]{64}$/.test(
+      VAULT_TX_HASH,
+    )
+  ) {
+    throw new Error(
+      "VAULT_TX_HASH must be a 32-byte transaction hash",
+    );
+  }
+
+  const privateKey =
+    process.env.CKB_PRIVATE_KEY;
+
+  if (!privateKey) {
+    throw new Error(
+      "CKB_PRIVATE_KEY is not set",
+    );
+  }
+
+  if (
+    !/^0x[0-9a-fA-F]{64}$/.test(
+      privateKey,
+    )
+  ) {
+    throw new Error(
+      "CKB_PRIVATE_KEY must be 0x followed by 64 hexadecimal characters",
+    );
+  }
+
+  const client =
+    createClient();
+
+  const signer =
+    new ccc.SignerCkbPrivateKey(
+      client,
+      privateKey,
+    );
+
+  const destination =
+    await signer.getRecommendedAddressObj();
 
   console.log(
     "Withdraw destination:",
     await signer.getRecommendedAddress(),
   );
 
-  const vaultOutPoint = ccc.OutPoint.from({
-    txHash: VAULT_TX_HASH,
-    index: VAULT_INDEX,
-  });
+  const vaultDeployment =
+    loadVaultDeployment();
 
-  console.log("\nChecking vault Cell...");
+  const vaultCellDep =
+    vaultDeployment
+      .cellDeps[0]
+      .cellDep;
+
+  console.log(
+    "\nVault code hash:",
+    vaultDeployment.codeHash,
+  );
+
+  console.log(
+    "Vault hash type:",
+    vaultDeployment.hashType,
+  );
+
+  console.log(
+    "Vault CellDep:",
+    `${vaultCellDep.outPoint.txHash}:${vaultCellDep.outPoint.index}`,
+  );
+
+  const vaultOutPoint =
+    ccc.OutPoint.from({
+      txHash:
+        VAULT_TX_HASH,
+
+      index:
+        VAULT_INDEX,
+    });
+
+  console.log(
+    "\nChecking vault Cell...",
+  );
+
+  console.log(
+    "Vault OutPoint:",
+    `${VAULT_TX_HASH}:${VAULT_INDEX}`,
+  );
 
   const vaultCell =
-    await client.getCell(vaultOutPoint);
+    await client.getCell(
+      vaultOutPoint,
+    );
 
   if (!vaultCell) {
     throw new Error(
@@ -196,7 +428,31 @@ async function main() {
     );
   }
 
-  console.log("Vault Cell is live.");
+  console.log(
+    "Vault Cell is live.",
+  );
+
+  const vaultLock =
+    vaultCell.cellOutput.lock;
+
+  if (
+    vaultLock.codeHash !==
+    vaultDeployment.codeHash
+  ) {
+    throw new Error(
+      `Vault Cell codeHash does not match current vault-lock deployment`,
+    );
+  }
+
+  if (
+    vaultLock.hashType !==
+    vaultDeployment.hashType
+  ) {
+    throw new Error(
+      `Vault Cell hashType does not match current vault-lock deployment`,
+    );
+  }
+
   console.log(
     "Vault capacity:",
     vaultCell.cellOutput.capacity.toString(),
@@ -208,52 +464,90 @@ async function main() {
     vaultCell.outputData,
   );
 
-  const expectedData = "0x6400000000000000";
+  const timelock =
+    decodeTimelock(
+      vaultCell.outputData as Hex,
+    );
 
-  if (vaultCell.outputData !== expectedData) {
+  console.log(
+    "Decoded timelock:",
+    timelock.toString(),
+  );
+
+  if (
+    vaultCell.cellOutput.capacity <=
+    TX_FEE
+  ) {
     throw new Error(
-      `Unexpected vault data: ${vaultCell.outputData}`,
+      "Vault capacity is smaller than or equal to withdrawal fee",
     );
   }
 
   const withdrawCapacity =
-    vaultCell.cellOutput.capacity - TX_FEE;
+    vaultCell.cellOutput.capacity -
+    TX_FEE;
 
-  const vaultDepOutPoint = ccc.OutPoint.from({
-    txHash: VAULT_LOCK_DEP_TX_HASH,
-    index: VAULT_LOCK_DEP_INDEX,
-  });
+  const vaultDepOutPoint =
+    ccc.OutPoint.from({
+      txHash:
+        vaultCellDep
+          .outPoint
+          .txHash,
 
-  const tx = ccc.Transaction.from({
-    inputs: [
-      {
-        previousOutput: vaultOutPoint,
-        since: TIMELOCK,
-      },
-    ],
+      index:
+        vaultCellDep
+          .outPoint
+          .index,
+    });
 
-    outputs: [
-      {
-        capacity: withdrawCapacity,
-        lock: recipientLock,
-      },
-    ],
+  const tx =
+    ccc.Transaction.from({
+      inputs: [
+        {
+          previousOutput:
+            vaultOutPoint,
 
-    outputsData: [
-      "0x",
-    ],
-  });
+          since:
+            timelock,
+        },
+      ],
+
+      outputs: [
+        {
+          capacity:
+            withdrawCapacity,
+
+          lock:
+            destination.script,
+        },
+      ],
+
+      outputsData: [
+        "0x",
+      ],
+    });
 
   tx.cellDeps.push(
     ccc.CellDep.from({
-      outPoint: vaultDepOutPoint,
-      depType: "code",
+      outPoint:
+        vaultDepOutPoint,
+
+      depType:
+        vaultCellDep.depType,
     }),
   );
 
-  console.log("\n========================================");
-  console.log("WITHDRAW TRANSACTION");
-  console.log("========================================");
+  console.log(
+    "\n========================================",
+  );
+
+  console.log(
+    "WITHDRAW TRANSACTION",
+  );
+
+  console.log(
+    "========================================",
+  );
 
   console.log(
     "Input:",
@@ -281,22 +575,41 @@ async function main() {
     "Shannons",
   );
 
-  console.log("\nCellDeps:");
+  console.log(
+    "\nCellDeps:",
+  );
 
-  tx.cellDeps.forEach((dep, i) => {
-    console.log(
-      `CellDep ${i}: ${dep.outPoint.txHash}:${dep.outPoint.index} depType=${dep.depType}`,
-    );
-  });
+  tx.cellDeps.forEach(
+    (
+      dep,
+      index,
+    ) => {
+      console.log(
+        `CellDep ${index}: ${dep.outPoint.txHash}:${dep.outPoint.index} depType=${dep.depType}`,
+      );
+    },
+  );
 
-  console.log("\nBroadcasting withdrawal...");
+  console.log(
+    "\nBroadcasting withdrawal...",
+  );
 
   const txHash =
-    await client.sendTransaction(tx);
+    await client.sendTransaction(
+      tx,
+    );
 
-  console.log("\n========================================");
-  console.log("VAULT WITHDRAWN");
+  console.log(
+    "\n========================================",
+  );
 
+  console.log(
+    "VAULT WITHDRAWN",
+  );
+
+  console.log(
+    "========================================",
+  );
 
   console.log(
     "Transaction hash:",
@@ -307,12 +620,32 @@ async function main() {
     "New output Cell:",
     `${txHash}:0`,
   );
+
+  console.log(
+    "Returned capacity:",
+    withdrawCapacity.toString(),
+    "Shannons",
+  );
 }
 
-main().catch((error) => {
-  console.error("\n========================================");
-  console.error("WITHDRAW FAILED");
-  console.error(error);
+main().catch(
+  (error) => {
+    console.error(
+      "\n========================================",
+    );
 
-  process.exit(1);
-});
+    console.error(
+      "WITHDRAW FAILED",
+    );
+
+    console.error(
+      "========================================",
+    );
+
+    console.error(
+      error,
+    );
+
+    process.exit(1);
+  },
+);
