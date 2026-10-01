@@ -50,19 +50,34 @@ git clone (https://github.com/Mannychino/CKB-Vault.git)
 Setup the OFFCKB NODE
 ```
   offckb node
+
 ```
-### Check the devnet
-```bash
-ckb-cli rpc get_tip_block_number
+### In the second terminal, list the pre-funded Devnet accounts:
+```
+offckb accounts
+
 ```
 
 ## Build the Rust contract 
 
 ```
 cd contracts/vault-lock
-cargo build --release --target riscv64imac-unknown-none-elf
+
+cargo build \
+  --release \
+  --target riscv64imac-unknown-none-elf \
+  --features contract \
+  --bin vault-lock
 ``` 
-Once your build the contract You should get something like this
+Once your build the contract you can verify using 
+
+ls -lh \
+target/riscv64imac-unknown-none-elf/release/vault-lock 
+
+and 
+ 
+ file \
+target/riscv64imac-unknown-none-elf/release/vault-lock
 
 ```
 contracts/vault-lock/target/riscv64imac-unknown-none-elf/release/vault-lock
@@ -77,6 +92,9 @@ ckb-cli util blake2b \
 ```
 ## Deploy the Script
 ```
+cd ~/CKB-Vault
+
+
 offckb deploy \
   --network devnet \
   --target contracts/vault-lock/target/riscv64imac-unknown-none-elf/release/vault-lock \
@@ -88,6 +106,7 @@ Check the scripts.json and system-scripts.json
 ```
 offckb system-scripts \
   --output contracts/vault-lock/deployment/system-scripts.json
+
   ```
 
 ## Compile the Typescript file
@@ -110,6 +129,7 @@ offckb accounts --show-private-keys
   export CKB_PRIVATE_KEY="private key"
 export CKB_RPC_URL="Your CKB RPC URL"
 export CKB_RPC_FALLBACK="YOUR_CKB_RPC_URL"
+
 ```
 **Optionally you can export vault amount and vault Timelock**
 ```
@@ -123,9 +143,9 @@ export VAULT_TIMELOCK="100"
 
 ***Copy the generated Vault Cell transaction hash and export***
 ```
-Configure withdrawal
-  export VAULT_TX_HASH
-  export VAULT_INDEX=0
+export VAULT_TX_HASH="0xYOUR_VAULT_TX_HASH"
+export VAULT_INDEX="0"
+
 ```
 ### Withdraw
 ```
@@ -133,6 +153,12 @@ Configure withdrawal
 ```
 
 If the devnet is reset or the vault contract is redeployed, regenerate or recheck `scripts.json` and `system-scripts.json` before creating another vault.
+
+### Start the frontend server
+```
+node frontend-v1/server.mjs
+
+```
 
 ## Security Warning
 
