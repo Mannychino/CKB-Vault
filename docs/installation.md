@@ -48,19 +48,20 @@ git clone (https://github.com/Mannychino/CKB-Vault.git)
 
 
 Setup the OFFCKB NODE
-```
+```bash
   offckb node
 
 ```
 ### In the second terminal, list the pre-funded Devnet accounts:
-```
+```bash
 offckb accounts
 
 ```
 
+
 ## Build the Rust contract 
 
-```
+```bash
 cd contracts/vault-lock
 
 cargo build \
@@ -70,23 +71,24 @@ cargo build \
   --bin vault-lock
 ``` 
 Once your build the contract you can verify using 
-
+```bash
 ls -lh \
 target/riscv64imac-unknown-none-elf/release/vault-lock 
 
+```
 and 
- 
+
+ ```bash
  file \
 target/riscv64imac-unknown-none-elf/release/vault-lock
 
 ```
-contracts/vault-lock/target/riscv64imac-unknown-none-elf/release/vault-lock
-```
-## Check the Compiled Contract
+### Check the Compiled Contract
 Before deploying, calculate the Blake2b hash of the compiled binary.
 From the project root:
 
 ```bash
+
 ckb-cli util blake2b \
   --binary-path contracts/vault-lock/target/riscv64imac-unknown-none-elf/release/vault-lock
 ```
@@ -103,10 +105,9 @@ offckb deploy \
 Check the scripts.json and system-scripts.json
 
 ## Export the System Script
-```
+```bash
 offckb system-scripts \
   --output contracts/vault-lock/deployment/system-scripts.json
-
   ```
 
 ## Compile the Typescript file
@@ -120,19 +121,19 @@ offckb system-scripts \
 offckb accounts
 ```
 **For Local Development You can use the private key.**
-```
+```bash
 offckb accounts --show-private-keys
 ```
 
 ## Configure account
-```
+```bash
   export CKB_PRIVATE_KEY="private key"
 export CKB_RPC_URL="Your CKB RPC URL"
 export CKB_RPC_FALLBACK="YOUR_CKB_RPC_URL"
 
 ```
 **Optionally you can export vault amount and vault Timelock**
-```
+```bash
 export VAULT_AMOUNT="5000"
 export VAULT_TIMELOCK="100"
 ```
@@ -141,14 +142,14 @@ export VAULT_TIMELOCK="100"
   node dist-ts/contracts/vault-lock/scripts/create_vault.js
 ```
 
-***Copy the generated Vault Cell transaction hash and export***
-```
+**Copy the generated Vault Cell transaction hash and export**
+```bash
 export VAULT_TX_HASH="0xYOUR_VAULT_TX_HASH"
 export VAULT_INDEX="0"
 
 ```
 ### Withdraw
-```
+```bash
   node dist-ts/contracts/vault-lock/scripts/withdraw_vault.js
 ```
 
