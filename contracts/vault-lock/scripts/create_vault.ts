@@ -502,17 +502,11 @@ async function main() {
     changeCreated,
   );
 
-  console.log(
-    "\n========================================",
-  );
 
   console.log(
     "TRANSACTION",
   );
 
-  console.log(
-    "========================================",
-  );
 
   console.log(
     "\nInputs:",

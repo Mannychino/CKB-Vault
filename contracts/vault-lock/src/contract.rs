@@ -1,29 +1,34 @@
-#![cfg_attr(not(any(feature = "library", test)), no_std)]
+#![cfg_attr(not(any(feature = "library, test")), no_std)]
 #![cfg_attr(not(test), no_main)]
 
 #[cfg(any(feature = "library", test))]
 extern crate alloc;
 
-#[cfg(not(any(feature = "library", test)))]
+#[cfg(not(any(feature = "library, test")))]
 ckb_std::entry!(program_entry);
 
-#[cfg(not(any(feature = "library", test)))]
+#[cfg(not(any(feature = "library, test")))]
 ckb_std::default_alloc!(16384, 1258306, 64);
 
-use ckb_std::ckb_constants::Source;
-use ckb_std::high_level::{load_cell_data, load_input_since};
+use ckb_std:: {
+    ckb_constants::Source,
+    high_level::{_load_cell, load_cell_data, load_input_since},
+    since::{LockValue, Since},
+};
 
-pub fn program_entry() -> i8 {
-    let since = match load_input_since(0, Source::Input) {
-        Ok(value) => value,
+pub fn program_entry() -> i8{
+    //This is the place to read since from first input in THIS script group and check if it is valid.
+    let raw_since = match load_input_since(0, SSource::GroupInput) {
+        ok(value) => value,
         Err(_) => return 1,
     };
 
-    let data = match load_cell_data(0, Source::Input) {
+    //Read cell data from the same vault-lock group.
+    let data = match load_cell_data(0, Source::GroupInput) {
         Ok(value) => value,
         Err(_) => return 1,
     };
-
+    
     if data.len() < 8 {
         return 1;
     }
@@ -31,11 +36,28 @@ pub fn program_entry() -> i8 {
     let mut timelock_bytes = [0u8; 8];
     timelock_bytes.copy_from_slice(&data[..8]);
 
-    let timelock = u64::from_le_bytes(timelock_bytes);
+    let timelock_value = u64::from_le_bytes(timelock_bytes);
 
-    if since < timelock {
+    //Parse the encoded since value.
+    let since = Since::new(raw_since);
+
+    //Reject invalid/reserved flag combinations.
+    if !since.flags_is_valid() {
         return 1;
     }
 
+    if !since.is_absolute() {
+        return 1;
+    }
+
+    let unlock_block = match since.extract_lock_value() {
+        Some(LockValue::BlockNumber(block_number)) => block_number,
+        _ => return 1,
+    };
+    
+    //compare the decoded block number, not the raw encoded u64.
+    if unlock_block < timelock {
+        return 1;
+    }
     0
 }

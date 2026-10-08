@@ -69,14 +69,6 @@ fn setup_creation_transaction() -> (Context, TransactionView, Script) {
 
     let vault_lock = build_lock_script(&mut context, contract_bin);
 
-    // let funding_lock = context
-    //     .build_script(
-    //         &context.deploy_cell(
-    //             ckb_testtool::builtin::ALWAYS_SUCCESS.clone().into(),
-    //         ),
-    //         Bytes::new(),
-    //     )
-    //     .expect("failed to build funding lock");
 let funding_out_point = context.deploy_cell(
     ckb_testtool::builtin::ALWAYS_SUCCESS.clone().into(),
 );
@@ -84,8 +76,6 @@ let funding_out_point = context.deploy_cell(
 let funding_lock = context
     .build_script(&funding_out_point, Bytes::new())
     .expect("failed to build funding lock");
-
-
 
 
     let funding_out_point = create_funding_cell(
@@ -148,7 +138,7 @@ fn test_vault_cell_contains_timelock() {
 
 #[test]
 fn test_vault_cell_capacity() {
-    let (context, tx, _) = setup_creation_transaction();
+    let (_context, tx, _) = setup_creation_transaction();
 
     let vault_output = tx
         .outputs()

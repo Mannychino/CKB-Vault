@@ -133,3 +133,44 @@ fn test_withdraw_after_timelock() {
 
     println!("Withdrawal after timelock correctly accepted!");
 }
+
+
+//Regression Test
+#[test]
+fn test_relative_since_zero_rejected(){
+    let (mut context, vault_out_point, lock_script) = setup_vault();
+    //Bit 63 = 1 means "Relative";
+    //Metric bits = 00 "block number";
+    // value = 0;
+  let relative_since_zero: u64 = 1u64 << 63;
+
+  let tx = withdraw_vault(
+    &mut context,
+    vault_out_point,
+    lock_script,
+    relative_since_zero,
+  ); 
+
+  let actual_since: u64 = tx
+   .inputs()
+    .get(0)
+    .expect("missing vault input")
+    .since()
+    .unpack();
+
+    println!("expected since: {:#x}", relative_since_zero);
+    println!("actual tx since: {:#x}", actual_since);
+
+    assert_eq!(
+        actual_since,
+        relative_since_zero,
+        "withdraw_vault should set the correct since value in the input"
+    );
+
+  let result = context.verify_tx(&tx, 10_000_000);
+
+  assert!(
+    result.is_err(),
+    "withdrawal with relative since zero should be rejectedc"
+  )
+}   
