@@ -91,6 +91,7 @@ From the project root:
 
 ckb-cli util blake2b \
   --binary-path contracts/vault-lock/target/riscv64imac-unknown-none-elf/release/vault-lock
+  
 ```
 ## Deploy the Script
 ```
@@ -106,8 +107,10 @@ Check the scripts.json and system-scripts.json
 
 ## Export the System Script
 ```bash
+
 offckb system-scripts \
   --output contracts/vault-lock/deployment/system-scripts.json
+
   ```
 
 ## Compile the Typescript file
@@ -140,6 +143,7 @@ export VAULT_TIMELOCK="100"
 ## Create vault
 ```
   node dist-ts/contracts/vault-lock/scripts/create_vault.js
+  
 ```
 
 **Copy the generated Vault Cell transaction hash and export**

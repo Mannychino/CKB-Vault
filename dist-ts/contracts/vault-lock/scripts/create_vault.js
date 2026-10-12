@@ -162,9 +162,7 @@ async function main() {
     const [additionalInputs, changeCreated,] = await tx.completeFeeBy(signer);
     console.log("Additional inputs:", additionalInputs);
     console.log("Change created:", changeCreated);
-    console.log("\n========================================");
     console.log("TRANSACTION");
-    console.log("========================================");
     console.log("\nInputs:");
     tx.inputs.forEach((input, index) => {
         console.log(`Input ${index}: ${input.previousOutput.txHash}:${input.previousOutput.index}`);
