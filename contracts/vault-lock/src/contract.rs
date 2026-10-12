@@ -1,25 +1,25 @@
-#![cfg_attr(not(any(feature = "library, test")), no_std)]
+#![cfg_attr(not(any(feature = "library", test)), no_std)]
 #![cfg_attr(not(test), no_main)]
 
 #[cfg(any(feature = "library", test))]
 extern crate alloc;
 
-#[cfg(not(any(feature = "library, test")))]
+#[cfg(not(any(feature = "library", test)))]
 ckb_std::entry!(program_entry);
 
-#[cfg(not(any(feature = "library, test")))]
+#[cfg(not(any(feature = "library", test)))]
 ckb_std::default_alloc!(16384, 1258306, 64);
 
 use ckb_std:: {
     ckb_constants::Source,
-    high_level::{_load_cell, load_cell_data, load_input_since},
+    high_level::{load_cell_data, load_input_since},
     since::{LockValue, Since},
 };
 
 pub fn program_entry() -> i8{
     //This is the place to read since from first input in THIS script group and check if it is valid.
-    let raw_since = match load_input_since(0, SSource::GroupInput) {
-        ok(value) => value,
+    let raw_since = match load_input_since(0, Source::GroupInput) {
+        Ok(value) => value,
         Err(_) => return 1,
     };
 
@@ -56,7 +56,7 @@ pub fn program_entry() -> i8{
     };
     
     //compare the decoded block number, not the raw encoded u64.
-    if unlock_block < timelock {
+    if unlock_block < timelock_value {
         return 1;
     }
     0
