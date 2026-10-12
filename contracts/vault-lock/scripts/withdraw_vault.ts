@@ -62,7 +62,8 @@ type KnownScriptType =
   };
 
 const NETWORK =
-  process.env.CKB_NETWORK ?? "devnet";
+  process.env.CKB_NETWORK ??
+  "devnet";
 
 const RPC_URL =
   process.env.CKB_RPC_URL ??
@@ -73,7 +74,9 @@ const RPC_FALLBACK =
   "http://127.0.0.1:8114";
 
 const VAULT_TX_HASH =
-  process.env.VAULT_TX_HASH as Hex | undefined;
+  process.env.VAULT_TX_HASH as
+    | Hex
+    | undefined;
 
 const VAULT_INDEX =
   BigInt(
@@ -227,7 +230,9 @@ function loadSystemScripts():
 
     [KnownScript.NervosDao]:
       toKnownScript(
-        getScript("dao"),
+        getScript(
+          "dao",
+        ),
       ),
 
     [KnownScript.AnyoneCanPay]:
@@ -239,12 +244,16 @@ function loadSystemScripts():
 
     [KnownScript.OmniLock]:
       toKnownScript(
-        getScript("omnilock"),
+        getScript(
+          "omnilock",
+        ),
       ),
 
     [KnownScript.XUdt]:
       toKnownScript(
-        getScript("xudt"),
+        getScript(
+          "xudt",
+        ),
       ),
   };
 }
@@ -283,10 +292,15 @@ function decodeTimelock(
   }
 
   const firstEightBytes =
-    hex.slice(0, 16);
+    hex.slice(
+      0,
+      16,
+    );
 
   const bytes =
-    firstEightBytes.match(/.{2}/g);
+    firstEightBytes.match(
+      /.{2}/g,
+    );
 
   if (!bytes) {
     throw new Error(
@@ -301,6 +315,32 @@ function decodeTimelock(
 
   return BigInt(
     `0x${bigEndian}`,
+  );
+}
+
+/*
+ * CKB relative block since encoding:
+ *
+ * bit 63 = 1 => relative
+ * bits 62-61 = 00 => block number
+ * lower bits = relative block delay
+ *
+ * Example:
+ *
+ * 100 blocks
+ *
+ * raw:
+ * 0x8000000000000064
+ */
+function encodeRelativeBlockSince(
+  blocks: bigint,
+): bigint {
+  const RELATIVE_FLAG =
+    1n << 63n;
+
+  return (
+    RELATIVE_FLAG |
+    blocks
   );
 }
 
@@ -369,11 +409,13 @@ async function main() {
     );
 
   const destination =
-    await signer.getRecommendedAddressObj();
+    await signer
+      .getRecommendedAddressObj();
 
   console.log(
     "Withdraw destination:",
-    await signer.getRecommendedAddress(),
+    await signer
+      .getRecommendedAddress(),
   );
 
   const vaultDeployment =
@@ -440,7 +482,7 @@ async function main() {
     vaultDeployment.codeHash
   ) {
     throw new Error(
-      `Vault Cell codeHash does not match current vault-lock deployment`,
+      "Vault Cell codeHash does not match current vault-lock deployment",
     );
   }
 
@@ -449,13 +491,16 @@ async function main() {
     vaultDeployment.hashType
   ) {
     throw new Error(
-      `Vault Cell hashType does not match current vault-lock deployment`,
+      "Vault Cell hashType does not match current vault-lock deployment",
     );
   }
 
   console.log(
     "Vault capacity:",
-    vaultCell.cellOutput.capacity.toString(),
+    vaultCell
+      .cellOutput
+      .capacity
+      .toString(),
     "Shannons",
   );
 
@@ -464,18 +509,46 @@ async function main() {
     vaultCell.outputData,
   );
 
-  const timelock =
+  /*
+   * V1.0.1:
+   *
+   * Vault data no longer means:
+   * "absolute unlock block".
+   *
+   * It means:
+   * "required relative lock duration
+   * in blocks".
+   */
+  const requiredBlocks =
     decodeTimelock(
-      vaultCell.outputData as Hex,
+      vaultCell
+        .outputData as Hex,
     );
 
   console.log(
-    "Decoded timelock:",
-    timelock.toString(),
+    "Required relative blocks:",
+    requiredBlocks.toString(),
+  );
+
+  /*
+   * Convert the plain block duration stored
+   * in the Vault Cell into the encoded CKB
+   * relative-block since value.
+   */
+  const relativeSince =
+    encodeRelativeBlockSince(
+      requiredBlocks,
+    );
+
+  console.log(
+    "Relative since:",
+    `0x${relativeSince.toString(16)}`,
   );
 
   if (
-    vaultCell.cellOutput.capacity <=
+    vaultCell
+      .cellOutput
+      .capacity <=
     TX_FEE
   ) {
     throw new Error(
@@ -484,7 +557,9 @@ async function main() {
   }
 
   const withdrawCapacity =
-    vaultCell.cellOutput.capacity -
+    vaultCell
+      .cellOutput
+      .capacity -
     TX_FEE;
 
   const vaultDepOutPoint =
@@ -508,7 +583,7 @@ async function main() {
             vaultOutPoint,
 
           since:
-            timelock,
+            relativeSince,
         },
       ],
 
@@ -555,13 +630,31 @@ async function main() {
   );
 
   console.log(
+    "Required delay:",
+    requiredBlocks.toString(),
+    "blocks",
+  );
+
+  console.log(
     "Input since:",
-    tx.inputs[0].since.toString(),
+    tx.inputs[0]
+      .since
+      .toString(),
+  );
+
+  console.log(
+    "Input since hex:",
+    `0x${tx.inputs[0]
+      .since
+      .toString(16)}`,
   );
 
   console.log(
     "Input capacity:",
-    vaultCell.cellOutput.capacity.toString(),
+    vaultCell
+      .cellOutput
+      .capacity
+      .toString(),
   );
 
   console.log(

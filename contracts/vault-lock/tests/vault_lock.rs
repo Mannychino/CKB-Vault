@@ -25,14 +25,14 @@ fn create_vault(
     context: &mut Context,
     lock_script: Script,
     capacity: u64,
-    timelock: u64,
+    required_blocks: u64,
 ) -> OutPoint {
     context.create_cell(
         CellOutput::new_builder()
             .capacity(capacity)
             .lock(lock_script)
             .build(),
-        Bytes::from(timelock.to_le_bytes().to_vec()),
+        Bytes::from(required_blocks.to_le_bytes().to_vec()),
     )
 }
 
@@ -66,7 +66,7 @@ fn withdraw_vault_with_extra_input(
     extra_input: OutPoint,
     vault_out_point: OutPoint,
     lock_script: Script,
-    since: u64,
+    vault_since: u64,
 ) -> TransactionView {
     let normal_input = CellInput::new_builder()
         .previous_output(extra_input)
@@ -75,7 +75,7 @@ fn withdraw_vault_with_extra_input(
 
     let vault_input = CellInput::new_builder()
         .previous_output(vault_out_point)
-        .since(since)
+        .since(vault_since)
         .build();
 
     let output = CellOutput::new_builder()
@@ -107,6 +107,7 @@ fn setup_vault() -> (Context, OutPoint, Script) {
     let lock_script =
         build_lock_script(&mut context, contract_bin);
 
+    // Vault requires a 100-block relative delay.
     let vault_out_point = create_vault(
         &mut context,
         lock_script.clone(),
@@ -117,16 +118,22 @@ fn setup_vault() -> (Context, OutPoint, Script) {
     (context, vault_out_point, lock_script)
 }
 
+fn relative_block_since(blocks: u64) -> u64 {
+    (1u64 << 63) | blocks
+}
+
 #[test]
 fn test_withdraw_before_timelock() {
     let (mut context, vault_out_point, lock_script) =
         setup_vault();
 
+    let relative_99 = relative_block_since(99);
+
     let tx = withdraw_vault(
         &mut context,
         vault_out_point,
         lock_script,
-        99u64,
+        relative_99,
     );
 
     let result =
@@ -134,10 +141,10 @@ fn test_withdraw_before_timelock() {
 
     assert!(
         result.is_err(),
-        "withdrawal should be rejected before timelock"
+        "relative delay of 99 blocks should be rejected"
     );
 
-    println!("Early withdrawal correctly rejected!");
+    println!("Relative 99 correctly rejected!");
 }
 
 #[test]
@@ -145,18 +152,20 @@ fn test_withdraw_at_timelock() {
     let (mut context, vault_out_point, lock_script) =
         setup_vault();
 
+    let relative_100 = relative_block_since(100);
+
     let tx = withdraw_vault(
         &mut context,
         vault_out_point,
         lock_script,
-        100u64,
+        relative_100,
     );
 
     context
         .verify_tx(&tx, 10_000_000)
-        .expect("withdrawal should succeed at timelock");
+        .expect("relative delay of 100 blocks should succeed");
 
-    println!("Withdrawal at timelock correctly accepted!");
+    println!("Relative 100 correctly accepted!");
 }
 
 #[test]
@@ -164,18 +173,20 @@ fn test_withdraw_after_timelock() {
     let (mut context, vault_out_point, lock_script) =
         setup_vault();
 
+    let relative_101 = relative_block_since(101);
+
     let tx = withdraw_vault(
         &mut context,
         vault_out_point,
         lock_script,
-        101u64,
+        relative_101,
     );
 
     context
         .verify_tx(&tx, 10_000_000)
-        .expect("withdrawal should succeed after timelock");
+        .expect("relative delay above required timelock should succeed");
 
-    println!("Withdrawal after timelock correctly accepted!");
+    println!("Relative 101 correctly accepted!");
 }
 
 #[test]
@@ -183,16 +194,13 @@ fn test_relative_since_zero_rejected() {
     let (mut context, vault_out_point, lock_script) =
         setup_vault();
 
-    // Bit 63 = 1 => relative.
-    // Metric bits = 00 => block number.
-    // Value = 0.
-    let relative_since_zero: u64 = 1u64 << 63;
+    let relative_0 = relative_block_since(0);
 
     let tx = withdraw_vault(
         &mut context,
         vault_out_point,
         lock_script,
-        relative_since_zero,
+        relative_0,
     );
 
     let actual_since: u64 = tx
@@ -202,19 +210,12 @@ fn test_relative_since_zero_rejected() {
         .since()
         .unpack();
 
-    println!(
-        "expected since: {:#x}",
-        relative_since_zero
-    );
-
-    println!(
-        "actual tx since: {:#x}",
-        actual_since
-    );
+    println!("expected since: {:#x}", relative_0);
+    println!("actual tx since: {:#x}", actual_since);
 
     assert_eq!(
         actual_since,
-        relative_since_zero,
+        relative_0,
         "withdraw_vault did not preserve relative since"
     );
 
@@ -223,47 +224,23 @@ fn test_relative_since_zero_rejected() {
 
     assert!(
         result.is_err(),
-        "relative block since = 0 must be rejected"
+        "relative delay of 0 blocks must be rejected"
     );
 }
 
 #[test]
-fn test_relative_since_100_rejected() {
+fn test_absolute_block_rejected() {
     let (mut context, vault_out_point, lock_script) =
         setup_vault();
 
-    // Relative flag + block-number value 100.
-    let relative_since_100: u64 =
-        (1u64 << 63) | 100u64;
+    // Absolute block-number since 100.
+    let absolute_100 = 100u64;
 
     let tx = withdraw_vault(
         &mut context,
         vault_out_point,
         lock_script,
-        relative_since_100,
-    );
-
-    let actual_since: u64 = tx
-        .inputs()
-        .get(0)
-        .expect("missing vault input")
-        .since()
-        .unpack();
-
-    println!(
-        "expected since: {:#x}",
-        relative_since_100
-    );
-
-    println!(
-        "actual tx since: {:#x}",
-        actual_since
-    );
-
-    assert_eq!(
-        actual_since,
-        relative_since_100,
-        "withdraw_vault did not preserve relative since"
+        absolute_100,
     );
 
     let result =
@@ -271,49 +248,28 @@ fn test_relative_since_100_rejected() {
 
     assert!(
         result.is_err(),
-        "relative block since = 100 must be rejected"
+        "absolute block since must be rejected in relative-timelock V1.0.1"
     );
 }
 
 #[test]
-fn test_absolute_timestamp_rejected() {
+fn test_relative_timestamp_rejected() {
     let (mut context, vault_out_point, lock_script) =
         setup_vault();
 
-    // Bit 63 = 0 => absolute.
-    // Metric bits = 10 => timestamp.
-    // Value = 100.
-    let absolute_timestamp: u64 =
-        (1u64 << 62) | 100u64;
+    // bit 63 = relative
+    // metric bits 10 = timestamp
+    // value = 100
+    let relative_timestamp_100: u64 =
+        (1u64 << 63) |
+        (1u64 << 62) |
+        100u64;
 
     let tx = withdraw_vault(
         &mut context,
         vault_out_point,
         lock_script,
-        absolute_timestamp,
-    );
-
-    let actual_since: u64 = tx
-        .inputs()
-        .get(0)
-        .expect("missing vault input")
-        .since()
-        .unpack();
-
-    println!(
-        "expected since: {:#x}",
-        absolute_timestamp
-    );
-
-    println!(
-        "actual tx since: {:#x}",
-        actual_since
-    );
-
-    assert_eq!(
-        actual_since,
-        absolute_timestamp,
-        "withdraw_vault did not preserve timestamp since"
+        relative_timestamp_100,
     );
 
     let result =
@@ -321,7 +277,7 @@ fn test_absolute_timestamp_rejected() {
 
     assert!(
         result.is_err(),
-        "absolute timestamp since must be rejected"
+        "relative timestamp since must be rejected"
     );
 }
 
@@ -330,39 +286,19 @@ fn test_invalid_since_flags_rejected() {
     let (mut context, vault_out_point, lock_script) =
         setup_vault();
 
-    // Metric bits 11 are invalid.
-    // Value = 100.
+    // bit 63 = relative
+    // metric bits 11 = invalid
+    // value = 100
     let invalid_since: u64 =
-        (3u64 << 61) | 100u64;
+        (1u64 << 63) |
+        (3u64 << 61) |
+        100u64;
 
     let tx = withdraw_vault(
         &mut context,
         vault_out_point,
         lock_script,
         invalid_since,
-    );
-
-    let actual_since: u64 = tx
-        .inputs()
-        .get(0)
-        .expect("missing vault input")
-        .since()
-        .unpack();
-
-    println!(
-        "expected since: {:#x}",
-        invalid_since
-    );
-
-    println!(
-        "actual tx since: {:#x}",
-        actual_since
-    );
-
-    assert_eq!(
-        actual_since,
-        invalid_since,
-        "withdraw_vault did not preserve invalid since"
     );
 
     let result =
@@ -379,7 +315,6 @@ fn test_vault_not_first_global_input() {
     let (mut context, vault_out_point, lock_script) =
         setup_vault();
 
-    // Deploy an unrelated script that always succeeds.
     let always_success_out_point =
         context.deploy_cell(ALWAYS_SUCCESS.clone());
 
@@ -390,7 +325,6 @@ fn test_vault_not_first_global_input() {
         )
         .expect("failed to build always-success lock");
 
-    // Create an unrelated Cell.
     let extra_cell = context.create_cell(
         CellOutput::new_builder()
             .capacity(1000u64)
@@ -399,19 +333,14 @@ fn test_vault_not_first_global_input() {
         Bytes::new(),
     );
 
-    // Global transaction layout:
-    //
-    // Input 0 = unrelated always-success Cell
-    // Input 1 = Vault Cell
-    //
-    // vault-lock must still read GroupInput 0,
-    // which refers to the Vault Cell.
+    let relative_100 = relative_block_since(100);
+
     let tx = withdraw_vault_with_extra_input(
         &mut context,
         extra_cell,
         vault_out_point,
         lock_script,
-        100u64,
+        relative_100,
     );
 
     let inputs = tx.inputs();
@@ -429,12 +358,12 @@ fn test_vault_not_first_global_input() {
         .unpack();
 
     println!(
-        "global input 0 since: {}",
+        "global input 0 since: {:#x}",
         input_0_since
     );
 
     println!(
-        "global input 1 vault since: {}",
+        "global input 1 vault since: {:#x}",
         input_1_since
     );
 
@@ -446,8 +375,8 @@ fn test_vault_not_first_global_input() {
 
     assert_eq!(
         input_1_since,
-        100u64,
-        "second global input should be the vault"
+        relative_100,
+        "second global input should contain the vault relative since"
     );
 
     let result =

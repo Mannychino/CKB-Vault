@@ -1,13 +1,13 @@
 {
   "devnet": {
     "vault-lock": {
-      "codeHash": "0xf5465fae1e21b1ff1a699de7288043d9ccff31b920f54fb250f32a320aa89679",
+      "codeHash": "0xc440b670fb1a9e56d4447956b87dee8b3b567ccc0f3e0d62422343f6be0064a5",
       "hashType": "data2",
       "cellDeps": [
         {
           "cellDep": {
             "outPoint": {
-              "txHash": "0xf2ed36b5796736ead8fc73bbeedbadfedc71c4c18732cd3ebfcfd7279c83b960",
+              "txHash": "0x537d9b063a044cca6012921eda66ba44ffdb3b4564cd7fd44c3063bdaafa0a62",
               "index": 0
             },
             "depType": "code"
