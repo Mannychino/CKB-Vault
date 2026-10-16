@@ -125,6 +125,7 @@ offckb accounts
 ```
 **For Local Development You can use the private key.**
 ```bash
+
 offckb accounts --show-private-keys
 ```
 

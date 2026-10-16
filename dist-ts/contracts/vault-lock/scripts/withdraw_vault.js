@@ -6,7 +6,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const node_fs_1 = require("node:fs");
 const node_path_1 = __importDefault(require("node:path"));
 const core_1 = require("@ckb-ccc/core");
-const NETWORK = process.env.CKB_NETWORK ?? "devnet";
+const NETWORK = process.env.CKB_NETWORK ??
+    "devnet";
 const RPC_URL = process.env.CKB_RPC_URL ??
     "http://127.0.0.1:28114";
 const RPC_FALLBACK = process.env.CKB_RPC_FALLBACK ??
@@ -102,6 +103,25 @@ function decodeTimelock(data) {
         .join("");
     return BigInt(`0x${bigEndian}`);
 }
+/*
+ * CKB relative block since encoding:
+ *
+ * bit 63 = 1 => relative
+ * bits 62-61 = 00 => block number
+ * lower bits = relative block delay
+ *
+ * Example:
+ *
+ * 100 blocks
+ *
+ * raw:
+ * 0x8000000000000064
+ */
+function encodeRelativeBlockSince(blocks) {
+    const RELATIVE_FLAG = 1n << 63n;
+    return (RELATIVE_FLAG |
+        blocks);
+}
 async function main() {
     console.log("Connecting to CKB devnet...");
     console.log("RPC:", RPC_URL);
@@ -122,8 +142,10 @@ async function main() {
     }
     const client = createClient();
     const signer = new core_1.ccc.SignerCkbPrivateKey(client, privateKey);
-    const destination = await signer.getRecommendedAddressObj();
-    console.log("Withdraw destination:", await signer.getRecommendedAddress());
+    const destination = await signer
+        .getRecommendedAddressObj();
+    console.log("Withdraw destination:", await signer
+        .getRecommendedAddress());
     const vaultDeployment = loadVaultDeployment();
     const vaultCellDep = vaultDeployment
         .cellDeps[0]
@@ -145,21 +167,46 @@ async function main() {
     const vaultLock = vaultCell.cellOutput.lock;
     if (vaultLock.codeHash !==
         vaultDeployment.codeHash) {
-        throw new Error(`Vault Cell codeHash does not match current vault-lock deployment`);
+        throw new Error("Vault Cell codeHash does not match current vault-lock deployment");
     }
     if (vaultLock.hashType !==
         vaultDeployment.hashType) {
-        throw new Error(`Vault Cell hashType does not match current vault-lock deployment`);
+        throw new Error("Vault Cell hashType does not match current vault-lock deployment");
     }
-    console.log("Vault capacity:", vaultCell.cellOutput.capacity.toString(), "Shannons");
+    console.log("Vault capacity:", vaultCell
+        .cellOutput
+        .capacity
+        .toString(), "Shannons");
     console.log("Vault data:", vaultCell.outputData);
-    const timelock = decodeTimelock(vaultCell.outputData);
-    console.log("Decoded timelock:", timelock.toString());
-    if (vaultCell.cellOutput.capacity <=
+    /*
+     * V1.0.1:
+     *
+     * Vault data no longer means:
+     * "absolute unlock block".
+     *
+     * It means:
+     * "required relative lock duration
+     * in blocks".
+     */
+    const requiredBlocks = decodeTimelock(vaultCell
+        .outputData);
+    console.log("Required relative blocks:", requiredBlocks.toString());
+    /*
+     * Convert the plain block duration stored
+     * in the Vault Cell into the encoded CKB
+     * relative-block since value.
+     */
+    const relativeSince = encodeRelativeBlockSince(requiredBlocks);
+    console.log("Relative since:", `0x${relativeSince.toString(16)}`);
+    if (vaultCell
+        .cellOutput
+        .capacity <=
         TX_FEE) {
         throw new Error("Vault capacity is smaller than or equal to withdrawal fee");
     }
-    const withdrawCapacity = vaultCell.cellOutput.capacity -
+    const withdrawCapacity = vaultCell
+        .cellOutput
+        .capacity -
         TX_FEE;
     const vaultDepOutPoint = core_1.ccc.OutPoint.from({
         txHash: vaultCellDep
@@ -173,7 +220,7 @@ async function main() {
         inputs: [
             {
                 previousOutput: vaultOutPoint,
-                since: timelock,
+                since: relativeSince,
             },
         ],
         outputs: [
@@ -194,8 +241,17 @@ async function main() {
     console.log("WITHDRAW TRANSACTION");
     console.log("========================================");
     console.log("Input:", `${VAULT_TX_HASH}:${VAULT_INDEX}`);
-    console.log("Input since:", tx.inputs[0].since.toString());
-    console.log("Input capacity:", vaultCell.cellOutput.capacity.toString());
+    console.log("Required delay:", requiredBlocks.toString(), "blocks");
+    console.log("Input since:", tx.inputs[0]
+        .since
+        .toString());
+    console.log("Input since hex:", `0x${tx.inputs[0]
+        .since
+        .toString(16)}`);
+    console.log("Input capacity:", vaultCell
+        .cellOutput
+        .capacity
+        .toString());
     console.log("Output capacity:", withdrawCapacity.toString());
     console.log("Fee:", TX_FEE.toString(), "Shannons");
     console.log("\nCellDeps:");

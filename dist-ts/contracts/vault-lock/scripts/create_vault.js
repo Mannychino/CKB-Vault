@@ -6,15 +6,50 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const node_fs_1 = require("node:fs");
 const node_path_1 = __importDefault(require("node:path"));
 const core_1 = require("@ckb-ccc/core");
-const NETWORK = process.env.CKB_NETWORK ?? "devnet";
+const NETWORK = process.env.CKB_NETWORK ??
+    "devnet";
 const RPC_URL = process.env.CKB_RPC_URL ??
     "http://127.0.0.1:28114";
 const RPC_FALLBACK = process.env.CKB_RPC_FALLBACK ??
     "http://127.0.0.1:8114";
 const VAULT_AMOUNT = process.env.VAULT_AMOUNT ??
     "5000";
-const TIMELOCK = BigInt(process.env.VAULT_TIMELOCK ??
+/*
+ * Normal user-facing mode:
+ *
+ * VAULT_UNLOCK_DATE=2026-10-19
+ *
+ * The user chooses a calendar date.
+ */
+const VAULT_UNLOCK_DATE = process.env.VAULT_UNLOCK_DATE;
+/*
+ * Developer/testing override.
+ *
+ * Example:
+ *
+ * VAULT_TIMELOCK=5
+ *
+ * means:
+ * lock for 5 relative blocks.
+ *
+ * If this is supplied, it takes priority over
+ * VAULT_UNLOCK_DATE.
+ */
+const VAULT_TIMELOCK = process.env.VAULT_TIMELOCK;
+/*
+ * Number of recent blocks used to estimate
+ * average block interval.
+ */
+const BLOCK_SAMPLE_SIZE = BigInt(process.env.CKB_BLOCK_SAMPLE_SIZE ??
     "100");
+/*
+ * Emergency/fallback estimate.
+ *
+ * This should only be used if recent block
+ * timestamps cannot be read.
+ */
+const FALLBACK_BLOCK_SECONDS = Number(process.env.CKB_FALLBACK_BLOCK_SECONDS ??
+    "10");
 const DEPLOYMENT_DIR = process.env.CKB_DEPLOYMENT_DIR ??
     node_path_1.default.resolve(process.cwd(), "contracts/vault-lock/deployment");
 const SCRIPTS_PATH = process.env.CKB_VAULT_SCRIPTS_PATH ??
@@ -78,19 +113,215 @@ function createClient() {
     if (NETWORK !== "devnet") {
         throw new Error(`Only devnet is currently supported. Received: ${NETWORK}`);
     }
-    const systemScripts = loadSystemScripts();
     return new core_1.ccc.ClientPublicTestnet({
         url: RPC_URL,
-        scripts: systemScripts,
+        scripts: loadSystemScripts(),
         fallbacks: RPC_FALLBACK
             ? [RPC_FALLBACK]
             : [],
     });
 }
-function encodeTimelock(timelock) {
+async function rpc(method, params = []) {
+    const response = await fetch(RPC_URL, {
+        method: "POST",
+        headers: {
+            "content-type": "application/json",
+        },
+        body: JSON.stringify({
+            id: 1,
+            jsonrpc: "2.0",
+            method,
+            params,
+        }),
+    });
+    if (!response.ok) {
+        throw new Error(`RPC HTTP error ${response.status}`);
+    }
+    const body = await response.json();
+    if (body.error) {
+        throw new Error(body.error.message ??
+            `RPC ${method} failed`);
+    }
+    if (body.result === undefined) {
+        throw new Error(`RPC ${method} returned no result`);
+    }
+    return body.result;
+}
+function encodeRelativeDuration(blocks) {
     const bytes = new Uint8Array(8);
-    new DataView(bytes.buffer).setBigUint64(0, timelock, true);
+    new DataView(bytes.buffer).setBigUint64(0, blocks, true);
     return core_1.ccc.hexFrom(bytes);
+}
+/*
+ * Parse YYYY-MM-DD.
+ *
+ * The user only chooses a date.
+ *
+ * We interpret that date as the END of the
+ * selected local calendar day.
+ *
+ * Example:
+ *
+ * 2026-10-19
+ *
+ * becomes:
+ *
+ * 19 Oct 2026 23:59:59.999 local time
+ */
+function parseUnlockDate(value) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/
+        .exec(value);
+    if (!match) {
+        throw new Error("VAULT_UNLOCK_DATE must use YYYY-MM-DD format");
+    }
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const unlockDate = new Date(year, month - 1, day, 23, 59, 59, 999);
+    /*
+     * Detect impossible dates such as:
+     *
+     * 2026-02-31
+     */
+    if (unlockDate.getFullYear() !==
+        year ||
+        unlockDate.getMonth() !==
+            month - 1 ||
+        unlockDate.getDate() !==
+            day) {
+        throw new Error(`Invalid unlock date: ${value}`);
+    }
+    if (unlockDate.getTime() <=
+        Date.now()) {
+        throw new Error("Unlock date must be in the future");
+    }
+    return unlockDate;
+}
+async function estimateAverageBlockSeconds() {
+    try {
+        const tip = await rpc("get_tip_header");
+        const tipNumber = BigInt(tip.number);
+        const sampleSize = tipNumber <
+            BLOCK_SAMPLE_SIZE
+            ? tipNumber
+            : BLOCK_SAMPLE_SIZE;
+        if (sampleSize ===
+            0n) {
+            throw new Error("Not enough blocks to calculate block interval");
+        }
+        const startNumber = tipNumber -
+            sampleSize;
+        const startHeader = await rpc("get_header_by_number", [
+            `0x${startNumber.toString(16)}`,
+        ]);
+        const tipTimestamp = BigInt(tip.timestamp);
+        const startTimestamp = BigInt(startHeader.timestamp);
+        if (tipTimestamp <=
+            startTimestamp) {
+            throw new Error("Invalid block timestamps");
+        }
+        const elapsedMilliseconds = tipTimestamp -
+            startTimestamp;
+        const averageMilliseconds = Number(elapsedMilliseconds) /
+            Number(sampleSize);
+        const averageSeconds = averageMilliseconds /
+            1000;
+        if (!Number.isFinite(averageSeconds) ||
+            averageSeconds <=
+                0) {
+            throw new Error("Invalid calculated block interval");
+        }
+        return averageSeconds;
+    }
+    catch (error) {
+        console.warn("\nUnable to calculate recent block interval.");
+        console.warn("Reason:", String(error));
+        console.warn("Using fallback block interval:", FALLBACK_BLOCK_SECONDS, "seconds");
+        return FALLBACK_BLOCK_SECONDS;
+    }
+}
+function calculateRequiredBlocks(unlockDate, averageBlockSeconds) {
+    const durationMilliseconds = unlockDate.getTime() -
+        Date.now();
+    if (durationMilliseconds <=
+        0) {
+        throw new Error("Unlock date must be in the future");
+    }
+    const durationSeconds = Math.ceil(durationMilliseconds /
+        1000);
+    /*
+     * Always round UP.
+     *
+     * We do not want the conversion to produce
+     * a shorter lock than requested.
+     */
+    const blocks = Math.ceil(durationSeconds /
+        averageBlockSeconds);
+    if (!Number.isSafeInteger(blocks) ||
+        blocks <=
+            0) {
+        throw new Error("Calculated block duration is invalid");
+    }
+    return BigInt(blocks);
+}
+function formatDuration(seconds) {
+    const days = Math.floor(seconds /
+        86400);
+    const hours = Math.floor((seconds %
+        86400) /
+        3600);
+    const minutes = Math.floor((seconds %
+        3600) /
+        60);
+    const parts = [];
+    if (days > 0) {
+        parts.push(`${days} day${days === 1 ? "" : "s"}`);
+    }
+    if (hours > 0) {
+        parts.push(`${hours} hour${hours === 1 ? "" : "s"}`);
+    }
+    if (minutes > 0 ||
+        parts.length === 0) {
+        parts.push(`${minutes} minute${minutes === 1 ? "" : "s"}`);
+    }
+    return parts.join(", ");
+}
+async function resolveRequiredBlocks() {
+    /*
+     * Development override.
+     *
+     * This lets us continue doing:
+     *
+     * VAULT_TIMELOCK=5
+     *
+     * for fast local tests.
+     */
+    if (VAULT_TIMELOCK !==
+        undefined) {
+        if (!/^\d+$/.test(VAULT_TIMELOCK)) {
+            throw new Error("VAULT_TIMELOCK must be a positive integer");
+        }
+        const requiredBlocks = BigInt(VAULT_TIMELOCK);
+        if (requiredBlocks <=
+            0n) {
+            throw new Error("VAULT_TIMELOCK must be greater than zero");
+        }
+        console.log("\nUsing developer block-duration override.");
+        return {
+            requiredBlocks,
+        };
+    }
+    if (!VAULT_UNLOCK_DATE) {
+        throw new Error("Set VAULT_UNLOCK_DATE=YYYY-MM-DD or use VAULT_TIMELOCK for development");
+    }
+    const unlockDate = parseUnlockDate(VAULT_UNLOCK_DATE);
+    const averageBlockSeconds = await estimateAverageBlockSeconds();
+    const requiredBlocks = calculateRequiredBlocks(unlockDate, averageBlockSeconds);
+    return {
+        requiredBlocks,
+        unlockDate,
+        averageBlockSeconds,
+    };
 }
 async function main() {
     console.log("Connecting to CKB devnet...");
@@ -106,8 +337,36 @@ async function main() {
     }
     const client = createClient();
     const signer = new core_1.ccc.SignerCkbPrivateKey(client, privateKey);
-    const signerAddress = await signer.getRecommendedAddress();
+    const signerAddress = await signer
+        .getRecommendedAddress();
     console.log("Signer:", signerAddress);
+    const { requiredBlocks, unlockDate, averageBlockSeconds, } = await resolveRequiredBlocks();
+    /*
+     * The Vault Cell stores ONLY the relative
+     * block duration.
+     *
+     * It does NOT store:
+     *
+     * - an absolute block height
+     * - a Unix timestamp
+     * - an encoded since value
+     */
+    const vaultData = encodeRelativeDuration(requiredBlocks);
+    console.log("\n========================================");
+    console.log("VAULT LOCK POLICY");
+    console.log("========================================");
+    if (unlockDate &&
+        averageBlockSeconds) {
+        const remainingSeconds = Math.ceil((unlockDate.getTime() -
+            Date.now()) /
+            1000);
+        console.log("Selected unlock date:", VAULT_UNLOCK_DATE);
+        console.log("Date boundary:", unlockDate.toString());
+        console.log("Requested duration:", formatDuration(remainingSeconds));
+        console.log("Estimated block interval:", averageBlockSeconds.toFixed(2), "seconds");
+    }
+    console.log("Required relative blocks:", requiredBlocks.toString());
+    console.log("Vault data:", vaultData);
     const vaultDeployment = loadVaultDeployment();
     const vaultCellDep = vaultDeployment
         .cellDeps[0]
@@ -132,11 +391,14 @@ async function main() {
     const vaultLock = core_1.ccc.Script.from({
         codeHash: vaultDeployment.codeHash,
         hashType: vaultDeployment.hashType,
+        /*
+         * Ownership will be added in the next
+         * sprint.
+         *
+         * v1.0.1 currently still uses empty args.
+         */
         args: "0x",
     });
-    const timelockData = encodeTimelock(TIMELOCK);
-    console.log("\nTimelock:", TIMELOCK.toString());
-    console.log("Timelock data:", timelockData);
     const vaultCapacity = core_1.ccc.fixedPointFrom(VAULT_AMOUNT);
     const tx = core_1.ccc.Transaction.from({
         outputs: [
@@ -146,7 +408,7 @@ async function main() {
             },
         ],
         outputsData: [
-            timelockData,
+            vaultData,
         ],
     });
     tx.cellDeps.push(core_1.ccc.CellDep.from({
@@ -162,7 +424,7 @@ async function main() {
     const [additionalInputs, changeCreated,] = await tx.completeFeeBy(signer);
     console.log("Additional inputs:", additionalInputs);
     console.log("Change created:", changeCreated);
-    console.log("TRANSACTION");
+    console.log("\nTRANSACTION");
     console.log("\nInputs:");
     tx.inputs.forEach((input, index) => {
         console.log(`Input ${index}: ${input.previousOutput.txHash}:${input.previousOutput.index}`);
@@ -187,8 +449,12 @@ async function main() {
     console.log("Transaction hash:", txHash);
     console.log("Vault Cell:", `${txHash}:0`);
     console.log("Vault amount:", VAULT_AMOUNT, "CKB");
-    console.log("Timelock:", TIMELOCK.toString());
-    console.log("Vault data:", timelockData);
+    console.log("Required relative blocks:", requiredBlocks.toString());
+    console.log("Vault data:", vaultData);
+    if (VAULT_UNLOCK_DATE) {
+        console.log("Requested unlock date:", VAULT_UNLOCK_DATE);
+        console.log("Note: date is an estimate; CKB enforces block count.");
+    }
 }
 main().catch((error) => {
     console.error("\n========================================");
