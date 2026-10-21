@@ -69,6 +69,7 @@ cargo build \
   --target riscv64imac-unknown-none-elf \
   --features contract \
   --bin vault-lock
+
 ``` 
 Once your build the contract you can verify using 
 ```bash
@@ -102,6 +103,7 @@ offckb deploy \
   --network devnet \
   --target contracts/vault-lock/target/riscv64imac-unknown-none-elf/release/vault-lock \
   --output contracts/vault-lock/deployment
+
 ``` 
 Check the scripts.json and system-scripts.json
 
@@ -139,16 +141,19 @@ export CKB_RPC_FALLBACK="YOUR_CKB_RPC_URL"
 **Optionally you can export vault amount and vault Timelock**
 ```bash
 export VAULT_AMOUNT="5000"
-export VAULT_TIMELOCK="100"
+export VAULT_UNLOCK_DATE="2026-10-25"
+unset VAULT_TIMELOCK
+
+unset VAULT_UNLOCK_DATE
+export VAULT_TIMELOCK="5"
 ```
 ## Create vault
 ```
   node dist-ts/contracts/vault-lock/scripts/create_vault.js
-  
-```
 
 **Copy the generated Vault Cell transaction hash and export**
 ```bash
+
 export VAULT_TX_HASH="0xYOUR_VAULT_TX_HASH"
 export VAULT_INDEX="0"
 
