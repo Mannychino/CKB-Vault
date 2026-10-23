@@ -133,9 +133,9 @@ offckb accounts --show-private-keys
 
 ## Configure account
 ```bash
-  export CKB_PRIVATE_KEY="private key"
-export CKB_RPC_URL="Your CKB RPC URL"
-export CKB_RPC_FALLBACK="YOUR_CKB_RPC_URL"
+  export CKB_PRIVATE_KEY=""
+export CKB_RPC_URL=""
+export CKB_RPC_FALLBACK=""
 
 ```
 **Optionally you can export vault amount and vault Timelock**
