@@ -133,7 +133,8 @@ offckb accounts --show-private-keys
 
 ## Configure account
 ```bash
-  export CKB_PRIVATE_KEY=""
+
+ export CKB_PRIVATE_KEY=""
 export CKB_RPC_URL=""
 export CKB_RPC_FALLBACK=""
 
@@ -146,6 +147,7 @@ unset VAULT_TIMELOCK
 
 unset VAULT_UNLOCK_DATE
 export VAULT_TIMELOCK="5"
+
 ```
 ## Create vault
 ```
@@ -160,7 +162,9 @@ export VAULT_INDEX="0"
 ```
 ### Withdraw
 ```bash
+
   node dist-ts/contracts/vault-lock/scripts/withdraw_vault.js
+  
 ```
 
 If the devnet is reset or the vault contract is redeployed, regenerate or recheck `scripts.json` and `system-scripts.json` before creating another vault.
