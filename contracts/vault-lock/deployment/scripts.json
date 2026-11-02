@@ -1,3 +1,4 @@
+
 {
   "devnet": {
     "vault-lock": {
@@ -7,7 +8,7 @@
         {
           "cellDep": {
             "outPoint": {
-              "txHash": "0x8744a96c7c5fb12ad8fc938c91657d62dc403e4288431406db09c0ece84403be",
+              "txHash": "0x867313f2b0406c76ee2b0b1f2a693caeb9d6391cf0ea81a98c757b7e1cd97b02",
               "index": 0
             },
             "depType": "code"

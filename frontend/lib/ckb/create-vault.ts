@@ -10,11 +10,7 @@ type CreateVaultParams = {
   requiredBlocks: bigint;
 };
 
-const VAULT_CODE_HASH =
-  "0xaf54cce2729447798f0cb8de2d74bfc7fc56d69d36f76b47c03335cb1b338648";
-
-const VAULT_CELL_DEP_TX_HASH =
-  "0x2c9760c8c2a8cc596f1655e76814c88362b2358fa9fe69e8b8d2841a6fee338b";
+ 
 
 export async function createVault({
   signer,
@@ -36,11 +32,18 @@ export async function createVault({
   const vaultData =
     encodeVaultData(requiredBlocks);
 
-  const vaultLock = {
-    codeHash: VAULT_CODE_HASH,
-    hashType: "data2" as const,
-    args: "0x",
-  };
+const vaultLock = {
+  codeHash:
+    vaultDeployment.codeHash,
+
+  hashType:
+    vaultDeployment.hashType,
+
+  args: "0x",
+};
+
+
+
 
   const tx =
     ccc.Transaction.from({
@@ -60,16 +63,10 @@ export async function createVault({
     });
 
   tx.cellDeps.push(
-    ccc.CellDep.from({
-      outPoint: {
-        txHash:
-          VAULT_CELL_DEP_TX_HASH,
-        index: 0,
-      },
-
-      depType: "code",
-    }),
-  );
+  ccc.CellDep.from(
+    vaultDeployment.cellDep,
+  ),
+);
 
   await tx.completeInputsByCapacity(
     signer,

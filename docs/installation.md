@@ -80,6 +80,7 @@ target/riscv64imac-unknown-none-elf/release/vault-lock
 and 
 
  ```bash
+
  file \
 target/riscv64imac-unknown-none-elf/release/vault-lock
 
@@ -134,7 +135,7 @@ offckb accounts --show-private-keys
 ## Configure account
 ```bash
 
- export CKB_PRIVATE_KEY=""
+export CKB_PRIVATE_KEY=""
 export CKB_RPC_URL=""
 export CKB_RPC_FALLBACK=""
 
