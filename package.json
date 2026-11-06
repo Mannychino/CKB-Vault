@@ -1,10 +1,15 @@
 {
-	"dependencies": {
-		"@ckb-ccc/core": "^1.19.1",
-		"@ckb-ccc/shell": "^1.3.9"
-	},
-	"devDependencies": {
-		"@types/node": "^26.3.0",
-		"typescript": "^7.0.2"
-	}
+  "scripts": {
+    "sync:vault-deployment": "node scripts/sync-vault-deployment.mjs",
+    "test:vault-deployment": "node --test scripts/sync-vault-deployment.test.mjs",
+    "deploy:vault": "offckb deploy --network devnet --target contracts/vault-lock/target/riscv64imac-unknown-none-elf/release/vault-lock --output contracts/vault-lock/deployment && node scripts/sync-vault-deployment.mjs && node --test scripts/sync-vault-deployment.test.mjs"
+  },
+  "dependencies": {
+    "@ckb-ccc/core": "^1.19.1",
+    "@ckb-ccc/shell": "^1.3.9"
+  },
+  "devDependencies": {
+    "@types/node": "^26.3.0",
+    "typescript": "^7.0.2"
+  }
 }

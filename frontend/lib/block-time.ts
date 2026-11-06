@@ -15,22 +15,29 @@ export async function estimateAverageBlockSeconds(
   const olderBlockNumber =
     tip - sampleSize;
 
-  const tipHeader =
-    await client.getHeaderByNumber(tip);
 
-  const olderHeader =
-    await client.getHeaderByNumber(
-      olderBlockNumber,
-    );
+ const tipHeader =
+  await client.getHeaderByNumber(tip);
 
-  const tipTimestamp =
-    Number(tipHeader.timestamp);
+const olderHeader =
+  await client.getHeaderByNumber(
+    olderBlockNumber,
+  );
 
-  const olderTimestamp =
-    Number(olderHeader.timestamp);
+if (!tipHeader || !olderHeader) {
+  throw new Error(
+    "Unable to load block headers for block-time estimation.",
+  );
+}
 
-  const elapsedMilliseconds =
-    tipTimestamp - olderTimestamp;
+const tipTimestamp =
+  Number(tipHeader.timestamp);
+
+const olderTimestamp =
+  Number(olderHeader.timestamp);
+
+
+  const elapsedMilliseconds = tipTimestamp - olderTimestamp;
 
   if (elapsedMilliseconds <= 0) {
     throw new Error(

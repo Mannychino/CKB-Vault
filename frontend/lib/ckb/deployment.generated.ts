@@ -6,7 +6,7 @@ export const vaultDeployment = {
   hashType: "data2",
   cellDep: {
     outPoint: {
-      txHash: "0x867313f2b0406c76ee2b0b1f2a693caeb9d6391cf0ea81a98c757b7e1cd97b02",
+      txHash: "0x838b918823a16424337a9ec6a5f710a0c63da88d4bfdc01687a53a89d5e73403",
       index: 0,
     },
     depType: "code",

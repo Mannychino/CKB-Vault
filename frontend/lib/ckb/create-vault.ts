@@ -4,13 +4,15 @@ import {
   encodeVaultData,
 } from "./vault-data.ts";
 
+import {
+  vaultDeployment,
+} from "./deployment.generated.ts";
+
 type CreateVaultParams = {
   signer: ccc.Signer;
   amountCkb: bigint;
   requiredBlocks: bigint;
 };
-
- 
 
 export async function createVault({
   signer,
@@ -32,18 +34,15 @@ export async function createVault({
   const vaultData =
     encodeVaultData(requiredBlocks);
 
-const vaultLock = {
-  codeHash:
-    vaultDeployment.codeHash,
+  const vaultLock = {
+    codeHash:
+      vaultDeployment.codeHash,
 
-  hashType:
-    vaultDeployment.hashType,
+    hashType:
+      vaultDeployment.hashType,
 
-  args: "0x",
-};
-
-
-
+    args: "0x",
+  };
 
   const tx =
     ccc.Transaction.from({
@@ -53,6 +52,7 @@ const vaultLock = {
             ccc.fixedPointFrom(
               amountCkb.toString(),
             ),
+
           lock: vaultLock,
         },
       ],
@@ -63,10 +63,10 @@ const vaultLock = {
     });
 
   tx.cellDeps.push(
-  ccc.CellDep.from(
-    vaultDeployment.cellDep,
-  ),
-);
+    ccc.CellDep.from(
+      vaultDeployment.cellDep,
+    ),
+  );
 
   await tx.completeInputsByCapacity(
     signer,
@@ -74,6 +74,11 @@ const vaultLock = {
 
   await tx.completeFeeBy(
     signer,
+  );
+
+  console.log(
+    "Vault CellDeps before send:",
+    tx.cellDeps,
   );
 
   const txHash =

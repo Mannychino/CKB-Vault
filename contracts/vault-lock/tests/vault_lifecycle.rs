@@ -7,6 +7,11 @@ use ckb_types::{
     prelude::*,
 };
 
+
+fn relative_block_since(blocks: u64) -> u64 {
+    (1u64 << 63) | blocks
+}
+
 fn build_vault_lock(context: &mut Context) -> Script {
     let contract_path = std::env::current_dir()
         .unwrap()
@@ -154,7 +159,7 @@ fn test_complete_vault_lifecycle() {
         &mut context,
         vault_out_point,
         vault_lock,
-        100u64,
+        relative_block_since(100),
     );
 
     // --------------------------------------------------

@@ -5,19 +5,17 @@ import fs from "node:fs";
 test(
   "generated frontend deployment matches scripts.json",
   () => {
-    const deployment =
-      JSON.parse(
-        fs.readFileSync(
-          "contracts/vault-lock/deployment/scripts.json",
-          "utf8",
-        ),
-      );
-
-    const generated =
+    const deployment = JSON.parse(
       fs.readFileSync(
-        "frontend/lib/ckb/deployment.generated.ts",
+        "contracts/vault-lock/deployment/scripts.json",
         "utf8",
-      );
+      ),
+    );
+
+    const generated = fs.readFileSync(
+      "frontend/lib/ckb/deployment.generated.ts",
+      "utf8",
+    );
 
     const vault =
       deployment.devnet["vault-lock"];
