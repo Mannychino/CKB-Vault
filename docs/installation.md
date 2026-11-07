@@ -220,7 +220,7 @@ cd ~/CKB-Vault
 pnpm deploy:vault
 
 ### 5. Verify the generated frontend deployment:
-cat frontend/lib/ckb/deployment.generated.ts
+cat frontend/lib/ckb/deployment.devnet.generated.ts
 
 ### 7. Verify the stale OutPoint is gone from the repo:
 grep -R -n \

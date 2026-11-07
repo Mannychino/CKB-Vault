@@ -59,7 +59,7 @@ pnpm exec tsc
 
 The deployment command deploys to devnet, regenerates the frontend vault deployment configuration, and runs its synchronization tests. It does not build the Rust binary first.
 
-The source deployment metadata is [scripts.json](../../contracts/vault-lock/deployment/scripts.json). The frontend consumes [deployment.generated.ts](../../frontend/lib/ckb/deployment.generated.ts). Do not copy transaction hashes from an earlier chain instance.
+The source deployment metadata is [scripts.json](../../contracts/vault-lock/deployment/scripts.json). The frontend consumes [deployment.devnet.generated.ts](../../frontend/lib/ckb/deployment.devnet.generated.ts). Do not copy transaction hashes from an earlier chain instance.
 
 After manually deploying, run:
 

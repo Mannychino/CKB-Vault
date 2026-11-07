@@ -13,7 +13,7 @@ test(
     );
 
     const generated = fs.readFileSync(
-      "frontend/lib/ckb/deployment.generated.ts",
+      "frontend/lib/ckb/deployment.devnet.generated.ts",
       "utf8",
     );
 

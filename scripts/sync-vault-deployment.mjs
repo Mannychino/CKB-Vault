@@ -10,7 +10,7 @@ const deploymentPath = path.join(
 
 const outputPath = path.join(
   root,
-  "frontend/lib/ckb/deployment.generated.ts",
+  "frontend/lib/ckb/deployment.devnet.generated.ts",
 );
 
 if (!fs.existsSync(deploymentPath)) {
