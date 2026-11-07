@@ -194,17 +194,17 @@ For local testing, private keys should be supplied through a secure local enviro
 
 
 
-1. Terminal 1 — start devnet:
+### 1. Terminal 1 — start devnet:
 
 cd ~/CKB-Vault
 offckb node
 
-2. Terminal 2 — verify the devnet is reachable:
+### 2. Terminal 2 — verify the devnet is reachable:
 
 cd ~/CKB-Vault
 offckb accounts
 
-3. Build the Rust contract:
+### 3. Build the Rust contract:
 
 cd ~/CKB-Vault/contracts/vault-lock
 
@@ -214,14 +214,15 @@ cargo build \
   --features contract \
   --bin vault-lock
 
-4. 5. Return to the repo root and deploy using the automated workflow:
+### 4. Return to the repo root and deploy using the automated workflow:
+
 cd ~/CKB-Vault
 pnpm deploy:vault
 
-5. 6. Verify the generated frontend deployment:
+### 5. Verify the generated frontend deployment:
 cat frontend/lib/ckb/deployment.generated.ts
 
-7. Verify the stale OutPoint is gone from the repo:
+### 7. Verify the stale OutPoint is gone from the repo:
 grep -R -n \
   --exclude-dir=node_modules \
   --exclude-dir=.git \
@@ -229,17 +230,20 @@ grep -R -n \
   "4a596d31dc35e88fb1591debbf680b04a44b4a434e3a94453c21ea8950ffb4d9" \
   .
 
-  8. Type-check the frontend:
+  ### 8. Type-check the frontend:
+  
   cd ~/CKB-Vault/frontend
 pnpm exec tsc --noEmit
 
-9. Run the frontend tests:
-node --test \
+### 9. Run the frontend tests:
+
+ node --test \
   lib/vault-time.test.ts \
   lib/block-time.test.ts \
   lib/ckb/vault-data.test.ts \
   lib/ckb/create-vault.test.ts
 
-  10. Clear the frontend cache and start Next.js:
+  ## 10. Clear the frontend cache and start Next.js:
+
   rm -rf .next
 pnpm dev
