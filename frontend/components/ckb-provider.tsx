@@ -4,8 +4,12 @@ import { useEffect, useState } from "react";
 import { ccc } from "@ckb-ccc/connector-react";
 
 import {
-  openDevnetClient,
-} from "@/lib/ckb/devnet-client";
+  getCkbNetwork,
+} from "@/lib/ckb/networks";
+
+import {
+  openCkbClient,
+} from "@/lib/ckb/client";
 
 type CkbProviderProps = {
   children: React.ReactNode;
@@ -18,8 +22,8 @@ export function CkbProvider({
     useState<ccc.Client | null>(null);
 
   useEffect(() => {
-    const clientOwner =
-      openDevnetClient();
+   const clientOwner =
+  openCkbClient();
 
     setClient(
       clientOwner.value,
@@ -33,8 +37,8 @@ export function CkbProvider({
   if (!client) {
     return (
       <div className="p-6">
-        Connecting to local CKB devnet...
-      </div>
+  Connecting to CKB {getCkbNetwork()}...
+</div>
     );
   }
 

@@ -1,43 +1,53 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 
 import {
-  DEVNET_RPC_URL,
-  devnetKnownScripts,
+  getCkbNetwork,
 } from "./networks.ts";
 
 test(
-  "devnet uses local OffCKB RPC",
+  "defaults to devnet",
   () => {
+    delete process.env
+      .NEXT_PUBLIC_CKB_NETWORK;
+
     assert.equal(
-      DEVNET_RPC_URL,
-      "http://127.0.0.1:28114",
+      getCkbNetwork(),
+      "devnet",
     );
   },
 );
 
 test(
-  "devnet secp256k1 dependency matches OffCKB",
+  "selects testnet",
   () => {
-    const dep =
-      devnetKnownScripts
-        .Secp256k1Blake160
-        .cellDeps[0]
-        .cellDep;
+    process.env
+      .NEXT_PUBLIC_CKB_NETWORK =
+      "testnet";
 
     assert.equal(
-      dep.outPoint.txHash,
-      "0x4d804f1495612631da202fe9902fa9899118554b08138cfe5dfb50e1ede76293",
+      getCkbNetwork(),
+      "testnet",
     );
 
-    assert.equal(
-      dep.outPoint.index,
-      0,
+    delete process.env
+      .NEXT_PUBLIC_CKB_NETWORK;
+  },
+);
+
+test(
+  "rejects unsupported network",
+  () => {
+    process.env
+      .NEXT_PUBLIC_CKB_NETWORK =
+      "mainnet";
+
+    assert.throws(
+      () => getCkbNetwork(),
+      /Unsupported CKB network/,
     );
 
-    assert.equal(
-      dep.depType,
-      "depGroup",
-    );
+    delete process.env
+      .NEXT_PUBLIC_CKB_NETWORK;
   },
 );

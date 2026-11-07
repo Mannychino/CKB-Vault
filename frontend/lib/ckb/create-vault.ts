@@ -5,8 +5,8 @@ import {
 } from "./vault-data.ts";
 
 import {
-  vaultDeployment,
-} from "./deployment.generated.ts";
+  getVaultDeployment,
+} from "./deployment.ts";
 
 type CreateVaultParams = {
   signer: ccc.Signer;
@@ -34,9 +34,11 @@ export async function createVault({
   const vaultData =
     encodeVaultData(requiredBlocks);
 
-  const vaultLock = {
-    codeHash:
-      vaultDeployment.codeHash,
+    
+
+    const vaultDeployment = getVaultDeployment();
+
+  const vaultLock = { codeHash: vaultDeployment.codeHash,
 
     hashType:
       vaultDeployment.hashType,
