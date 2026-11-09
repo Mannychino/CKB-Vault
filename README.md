@@ -1,3 +1,5 @@
+
+![image](https://github.com/Mannychino/CKB-Vault/blob/160e126901e7c1b037745f8d861f8fe9a68c5190/Screenshot%20(37).png)
 # CKB Vault
 
 CKB Vault is a decentralized vault prototype built on the **Nervos CKB blockchain**. The project explores how assets can be deposited into a vault and controlled by programmable lock policies implemented through CKB scripts.
