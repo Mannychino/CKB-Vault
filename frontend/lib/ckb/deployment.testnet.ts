@@ -1,2 +1,17 @@
-export const testnetVaultDeployment =
-  null;
+export const testnetVaultDeployment = {
+  codeHash:
+    "0xd6ec1bf456dff0d26ac3b210986d3b6e278eb1e56fa665879bb9a44a836dbb8a",
+
+  hashType: "data2",
+
+  cellDep: {
+    outPoint: {
+      txHash:
+        "0x147e660e77a9a406a6fdcfc95eb82bf4d6bcbb0a98a2c77685357d47ebdcaf0c",
+
+      index: 0,
+    },
+
+    depType: "code",
+  },
+} as const;

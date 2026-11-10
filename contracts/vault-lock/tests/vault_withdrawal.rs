@@ -86,7 +86,7 @@ fn test_withdrawal_before_timelock_rejected() {
         &mut context,
         vault_out_point,
         vault_lock,
-        99u64,
+        relative_block_since(99),
     );
 
     let result = context.verify_tx(&tx, 10_000_000);
@@ -95,8 +95,6 @@ fn test_withdrawal_before_timelock_rejected() {
         result.is_err(),
         "withdrawal should be rejected before timelock"
     );
-
-    println!("Early withdrawal correctly rejected!");
 }
 
 #[test]
@@ -107,14 +105,12 @@ fn test_withdrawal_at_timelock_allowed() {
         &mut context,
         vault_out_point,
         vault_lock,
-        100u64,
+        relative_block_since(100),
     );
 
     context
         .verify_tx(&tx, 10_000_000)
         .expect("withdrawal should succeed at timelock");
-
-    println!("Withdrawal at timelock correctly accepted!");
 }
 
 #[test]
@@ -125,13 +121,10 @@ fn test_withdrawal_after_timelock_allowed() {
         &mut context,
         vault_out_point,
         vault_lock,
-        101u64,
+        relative_block_since(101),
     );
 
     context
         .verify_tx(&tx, 10_000_000)
         .expect("withdrawal should succeed after timelock");
-
-    println!("Withdrawal after timelock correctly accepted!");
 }
-
